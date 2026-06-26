@@ -14,7 +14,19 @@ export function useChat(threadModuleId: number | null) {
   }, []);
 
   useEffect(() => {
-    if (!socket || !threadModuleId) return;
+    if (!socket || !threadModuleId) {
+      setMessages([]);
+      return;
+    }
+
+    setMessages([]);
+
+    socket.emit("message:history", { thread_module_id: threadModuleId }, (response: { success: boolean; data?: MessageResponse[]; message?: string }) => {
+      if (response.success && response.data) {
+        setMessages(response.data);
+        setTimeout(scrollToBottom, 50);
+      }
+    });
 
     const handleNewMessage = (message: MessageResponse) => {
       if (message.thread_module_id === threadModuleId) {

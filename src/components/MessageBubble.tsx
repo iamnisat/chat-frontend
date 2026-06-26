@@ -27,23 +27,32 @@ function formatTime(dateString: string): string {
 }
 
 export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
+  const isAI = message.sender_type === "ai_agent";
+
   return (
     <div className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-3`}>
       <div
         className={`max-w-[75%] rounded-2xl px-4 py-2 ${
           isOwn
             ? "bg-blue-600 text-white rounded-br-md"
-            : message.sender_type === "ai_agent"
+            : isAI
             ? "bg-gray-100 text-gray-900 rounded-bl-md"
             : "bg-green-100 text-gray-900 rounded-bl-md"
         }`}
       >
         {!isOwn && (
-          <div className={`text-xs font-semibold mb-1 ${message.sender_type === "ai_agent" ? "text-blue-600" : "text-green-700"}`}>
+          <div className={`text-xs font-semibold mb-1 ${isAI ? "text-blue-600" : "text-green-700"}`}>
             {message.sender_name}
           </div>
         )}
-        <div className="text-sm whitespace-pre-wrap break-words">{message.message}</div>
+        {isAI ? (
+          <div
+            className="text-sm ai-message-content"
+            dangerouslySetInnerHTML={{ __html: message.message }}
+          />
+        ) : (
+          <div className="text-sm whitespace-pre-wrap break-words">{message.message}</div>
+        )}
         <div className={`text-xs mt-1 ${isOwn ? "text-blue-200" : "text-gray-500"}`}>
           {formatTime(message.created_at)}
         </div>
