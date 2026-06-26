@@ -81,7 +81,7 @@ export function MessageInput({ onSendMessage, onTypingStart, onTypingStop, disab
   const hasText = message.trim().length > 0;
 
   return (
-    <div className="border-t border-purple-100 bg-white px-4 py-3">
+    <div className="border-t border-purple-100 bg-white px-4 py-3 flex-shrink-0">
       <div className="max-w-3xl mx-auto">
         <div className="flex items-end gap-2 bg-gray-50 rounded-2xl border border-gray-200 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-100 transition-all">
           <textarea

@@ -5,7 +5,7 @@ export interface MessageResponse {
   thread_module_id: number;
   message: string;
   user_id: number | null;
-  farmer_id: number | null;
+  farmer_id: string | null;
   sender_type: LoginType | "ai_agent";
   sender_name: string;
   created_at: string;
@@ -13,7 +13,7 @@ export interface MessageResponse {
 
 export interface UserPayload {
   user_id?: number;
-  farmer_id?: number;
+  farmer_id?: string;
   login_type?: LoginType;
   parent_id?: number;
   name?: string;
@@ -22,7 +22,7 @@ export interface UserPayload {
 export interface SendMessagePayload {
   thread_module_id: number;
   message: string;
-  farmer_id?: number;
+  farmer_id?: string;
   user_id?: number;
   sender_type?: LoginType | "ai_agent";
   client_id?: string;
@@ -32,7 +32,7 @@ export interface SendMessagePayload {
 export interface TypingPayload {
   thread_module_id: number;
   user_id?: number;
-  farmer_id?: number;
+  farmer_id?: string;
   sender_name?: string;
 }
 

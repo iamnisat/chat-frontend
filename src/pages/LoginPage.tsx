@@ -10,7 +10,7 @@ export function LoginPage() {
 
     const userData = {
       loginType: "farmer",
-      farmerId: Date.now(),
+      farmerId: `${name.trim()}_${Date.now()}`,
       userId: undefined,
       parentId: undefined,
       name: name.trim(),

@@ -19,9 +19,9 @@ function ChatContent() {
   const navigate = useNavigate();
   const [selectedThread, setSelectedThread] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { joinThread, leaveThread } = useSocketContext();
-  const chat = useChat(selectedThread);
+  const { joinThread, leaveThread, socket } = useSocketContext();
   const [userData, setUserData] = useState<UserPayload | null>(null);
+  const chat = useChat(selectedThread, userData?.login_type === "farmer" ? userData?.farmer_id : userData?.user_id != null ? String(userData.user_id) : undefined, userData?.login_type);
 
   useEffect(() => {
     const stored = localStorage.getItem("chatUser");
@@ -38,6 +38,12 @@ function ChatContent() {
       name: parsed.name,
     });
   }, [navigate]);
+
+  const handleLogout = useCallback(() => {
+    socket?.disconnect();
+    localStorage.removeItem("chatUser");
+    navigate("/");
+  }, [socket, navigate]);
 
   const handleSelectThread = useCallback(
     (threadId: number) => {
@@ -79,37 +85,58 @@ function ChatContent() {
   const selectedThreadName = MOCK_THREADS.find((t) => t.id === selectedThread)?.name || "";
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-dvh flex flex-col bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-purple-100 px-4 py-3 flex items-center justify-between flex-shrink-0 z-30">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="md:hidden p-1.5 rounded-lg hover:bg-purple-50 transition-colors text-gray-500"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-          </button>
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--own-gradient)" }}>
-            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 20.105V4.875A1.875 1.875 0 0 1 5.625 3h12.75A1.875 1.875 0 0 1 20.25 4.875v10.5A1.875 1.875 0 0 1 18.375 17.25H7.5l-3.75 2.855Z" />
-            </svg>
+      <header className="bg-white border-b border-purple-100 flex-shrink-0 z-30">
+        <div className="px-4 py-3 flex items-center justify-between">
+          {/* Left: User info */}
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden p-2 rounded-xl hover:bg-purple-50 transition-colors text-gray-500 flex-shrink-0"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+            <div className="relative flex-shrink-0">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white shadow-md"
+                   style={{ background: "var(--own-gradient)" }}>
+                {userData.name?.charAt(0).toUpperCase() || "U"}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 border-2 border-white rounded-full"></span>
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-sm font-bold text-gray-800 leading-tight truncate max-w-[120px] sm:max-w-[200px]">
+                {userData.name || "User"}
+              </h1>
+              <ConnectionStatus />
+            </div>
           </div>
-          <div>
-            <h1 className="text-base font-bold text-gray-800 leading-tight">Chat App</h1>
-            {selectedThread && (
-              <p className="text-xs text-purple-400 font-medium">{selectedThreadName}</p>
-            )}
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl hover:bg-rose-50 transition-colors text-gray-400 hover:text-rose-500"
+              title="Logout"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+              </svg>
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <ConnectionStatus />
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
-               style={{ background: "linear-gradient(135deg, #a78bfa 0%, #f472b6 100%)" }}>
-            {userData.name?.charAt(0).toUpperCase() || "F"}
+
+        {/* Thread name bar (when thread selected) */}
+        {selectedThread && (
+          <div className="px-4 py-2 bg-purple-50/50 border-t border-purple-100/50 flex items-center gap-2">
+            <svg className="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+            </svg>
+            <span className="text-xs font-semibold text-purple-700 truncate">{selectedThreadName}</span>
           </div>
-        </div>
+        )}
       </header>
 
       {/* Mobile sidebar overlay */}
@@ -139,7 +166,7 @@ function ChatContent() {
       </div>
 
       {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Desktop sidebar */}
         <div className="hidden md:block w-72 border-r border-purple-100 bg-white flex-shrink-0">
           <ThreadList
@@ -150,17 +177,19 @@ function ChatContent() {
         </div>
 
         {/* Chat area */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {selectedThread ? (
             <>
-              <ChatWindow
-                messages={chat.messages}
-                currentUserId={userData.user_id ?? userData.farmer_id ?? 0}
-                currentUserType={userData.login_type ?? "user"}
-                isTyping={chat.isTyping}
-                typingUser={chat.typingUser}
-                messagesEndRef={chat.messagesEndRef}
-              />
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ChatWindow
+                  messages={chat.messages}
+                  currentUserId={userData.login_type === "farmer" ? (userData.farmer_id ?? "") : String(userData.user_id ?? "")}
+                  currentUserType={userData.login_type ?? "user"}
+                  isTyping={chat.isTyping}
+                  typingUser={chat.typingUser}
+                  messagesEndRef={chat.messagesEndRef}
+                />
+              </div>
               <MessageInput
                 onSendMessage={handleSendMessage}
                 onTypingStart={handleTypingStart}

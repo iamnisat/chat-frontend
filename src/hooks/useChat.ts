@@ -1,8 +1,110 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSocketContext } from "../context/SocketContext";
-import type { MessageResponse, SendMessagePayload } from "../types";
+import type { MessageResponse, SendMessagePayload, LoginType } from "../types";
 
-export function useChat(threadModuleId: number | null) {
+function normalizeHistoricalMessage(
+  raw: Record<string, unknown>,
+  currentUserId: string,
+  currentUserType: LoginType
+): MessageResponse {
+  const senderType = (
+    (raw.sender_type as string) ??
+    (raw.senderType as string) ??
+    (raw.role as string) ??
+    (raw.from as string) ??
+    ""
+  ).toLowerCase();
+
+  const senderId =
+    raw.sender_id ??
+    raw.senderId ??
+    raw.user_id ??
+    raw.userId ??
+    raw.farmer_id ??
+    raw.farmerId ??
+    null;
+
+  const rawFarmerId =
+    raw.farmer_id ??
+    raw.farmerId ??
+    (senderType === "farmer" ? senderId : null);
+  const rawUserId =
+    raw.user_id ??
+    raw.userId ??
+    (senderType === "user" ? senderId : null);
+
+  const farmerId = rawFarmerId != null ? String(rawFarmerId) : null;
+  const userId = rawUserId != null ? Number(rawUserId) : null;
+
+  const senderName =
+    (raw.sender_name as string) ??
+    (raw.senderName as string) ??
+    (raw.name as string) ??
+    "";
+
+  const isAiMessage =
+    senderType === "ai_agent" ||
+    senderType === "ai" ||
+    senderType === "assistant" ||
+    senderType === "agent" ||
+    senderName.toLowerCase().includes("aunkur ai") ||
+    senderName.toLowerCase().includes("ai");
+
+  let resolvedSenderType: "farmer" | "user" | "ai_agent";
+  if (isAiMessage) {
+    resolvedSenderType = "ai_agent";
+  } else if (senderType === "farmer" || senderType === "user") {
+    resolvedSenderType = senderType as "farmer" | "user";
+  } else if (currentUserType === "farmer" && farmerId === currentUserId) {
+    resolvedSenderType = "farmer";
+  } else if (currentUserType === "user" && userId != null && String(userId) === currentUserId) {
+    resolvedSenderType = "user";
+  } else {
+    resolvedSenderType = "ai_agent";
+  }
+
+  const isOwn =
+    !isAiMessage &&
+    ((currentUserType === "farmer" && farmerId === currentUserId) ||
+      (currentUserType === "user" && userId != null && String(userId) === currentUserId));
+
+  const normalizedFarmerId = isOwn && currentUserType === "farmer" ? currentUserId : farmerId;
+  const normalizedUserId = isOwn && currentUserType === "user" ? (currentUserId != null ? Number(currentUserId) : null) : userId;
+
+  const resolvedSenderName =
+    senderName ||
+    (resolvedSenderType === "ai_agent"
+      ? "Aunkur AI"
+      : resolvedSenderType === "farmer"
+      ? (normalizedFarmerId?.split("_")[0] ?? "Farmer")
+      : `User ${normalizedUserId ?? "unknown"}`);
+
+  const message: MessageResponse = {
+    id: (raw.id as string) ?? `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    thread_module_id: (raw.thread_module_id as number) ?? 0,
+    message: ((raw.message as string) ?? (raw.text as string) ?? (raw.content as string) ?? "") as string,
+    user_id: normalizedUserId,
+    farmer_id: normalizedFarmerId,
+    sender_type: resolvedSenderType,
+    sender_name: resolvedSenderName,
+    created_at: ((raw.created_at as string) ?? (raw.createdAt as string) ?? new Date().toISOString()) as string,
+  };
+
+  console.log(
+    "[History] Normalized message =>",
+    `id: ${message.id}`,
+    `senderType: ${message.sender_type}`,
+    `farmerId: ${message.farmer_id}`,
+    `userId: ${message.user_id}`,
+    `senderName: ${message.sender_name}`,
+    `isOwn: ${isOwn}`,
+    `text: ${message.message.substring(0, 50)}`
+  );
+
+  return message;
+}
+
+export function useChat(threadModuleId: number | null, currentUserId?: string, currentUserType?: LoginType) {
   const { socket, isConnected } = useSocketContext();
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -23,14 +125,24 @@ export function useChat(threadModuleId: number | null) {
 
     socket.emit("message:history", { thread_module_id: threadModuleId }, (response: { success: boolean; data?: MessageResponse[]; message?: string }) => {
       if (response.success && response.data) {
-        setMessages(response.data);
+        const normalized = currentUserId != null && currentUserType != null
+          ? response.data.map((msg) =>
+              normalizeHistoricalMessage(msg as unknown as Record<string, unknown>, currentUserId, currentUserType)
+            )
+          : response.data;
+        setMessages(normalized);
         setTimeout(scrollToBottom, 50);
       }
     });
 
     const handleNewMessage = (message: MessageResponse) => {
       if (message.thread_module_id === threadModuleId) {
-        setMessages((prev) => [...prev, message]);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === message.id)) {
+            return prev;
+          }
+          return [...prev, message];
+        });
       }
     };
 
@@ -83,7 +195,7 @@ export function useChat(threadModuleId: number | null) {
       socket.off("message:updated", handleMessageUpdated);
       socket.off("message:deleted", handleMessageDeleted);
     };
-  }, [socket, threadModuleId]);
+  }, [socket, threadModuleId, currentUserId, currentUserType]);
 
   useEffect(() => {
     scrollToBottom();
@@ -113,7 +225,7 @@ export function useChat(threadModuleId: number | null) {
   }, [socket, isConnected, threadModuleId]);
 
   const emitTypingStart = useCallback(
-    (senderName: string, userId?: number, farmerId?: number) => {
+    (senderName: string, userId?: number, farmerId?: string) => {
       if (!socket || !isConnected || !threadModuleId) return;
       socket.emit("typing:start", {
         thread_module_id: threadModuleId,
@@ -126,7 +238,7 @@ export function useChat(threadModuleId: number | null) {
   );
 
   const emitTypingStop = useCallback(
-    (userId?: number, farmerId?: number) => {
+    (userId?: number, farmerId?: string) => {
       if (!socket || !isConnected || !threadModuleId) return;
       socket.emit("typing:stop", {
         thread_module_id: threadModuleId,

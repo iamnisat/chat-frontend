@@ -5,7 +5,7 @@ import { TypingIndicator } from "./TypingIndicator";
 
 interface ChatWindowProps {
   messages: MessageResponse[];
-  currentUserId: number;
+  currentUserId: string;
   currentUserType: "farmer" | "user";
   isTyping: boolean;
   typingUser: string;
@@ -18,7 +18,7 @@ export function ChatWindow({ messages, currentUserId, currentUserType, isTyping,
   }, [messages, isTyping, messagesEndRef]);
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6" style={{ background: "var(--surface)" }}>
+    <div className="h-full overflow-y-auto px-4 py-6" style={{ background: "var(--surface)" }}>
       {messages.length === 0 ? (
         <div className="flex items-center justify-center h-full">
           <div className="text-center animate-float">
