@@ -1,7 +1,94 @@
 @import "tailwindcss";
 
+:root {
+  --primary: #7c3aed;
+  --primary-light: #a78bfa;
+  --primary-dark: #5b21b6;
+  --accent: #f472b6;
+  --surface: #faf5ff;
+  --surface-card: #ffffff;
+  --text-primary: #1e1b4b;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --border: #e9d5ff;
+  --border-light: #f3e8ff;
+  --own-gradient: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  --ai-gradient: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%);
+  --farmer-gradient: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d8b4fe;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a78bfa;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.25s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.25s ease-out;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Message content styles */
 .ai-message-content p {
   margin-bottom: 0.5rem;
+  line-height: 1.6;
 }
 
 .ai-message-content p:last-child {
@@ -28,69 +115,104 @@
 
 .ai-message-content strong {
   font-weight: 600;
+  color: #5b21b6;
 }
 
 .ai-message-content a {
-  color: #2563eb;
+  color: #7c3aed;
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .ai-message-content code {
-  background-color: #e5e7eb;
+  background-color: #ede9fe;
+  color: #5b21b6;
   padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
+  border-radius: 0.375rem;
   font-size: 0.8125rem;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 .ai-message-content pre {
-  background-color: #1f2937;
-  color: #e5e7eb;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
+  background-color: #1e1b4b;
+  color: #e9d5ff;
+  padding: 0.875rem;
+  border-radius: 0.75rem;
   overflow-x: auto;
   margin: 0.5rem 0;
+  border: 1px solid #312e81;
 }
 
 .ai-message-content pre code {
   background: none;
   padding: 0;
   color: inherit;
+  font-size: 0.8125rem;
 }
 
 .ai-message-content h1,
 .ai-message-content h2,
 .ai-message-content h3 {
-  font-weight: 600;
-  margin: 0.5rem 0 0.25rem;
+  font-weight: 700;
+  margin: 0.75rem 0 0.375rem;
+  color: #1e1b4b;
 }
 
-.ai-message-content h1 {
-  font-size: 1.125rem;
-}
-
-.ai-message-content h2 {
-  font-size: 1rem;
-}
-
-.ai-message-content h3 {
-  font-size: 0.875rem;
-}
+.ai-message-content h1 { font-size: 1.125rem; }
+.ai-message-content h2 { font-size: 1rem; }
+.ai-message-content h3 { font-size: 0.875rem; }
 
 .ai-message-content table {
   border-collapse: collapse;
   margin: 0.5rem 0;
   width: 100%;
+  border-radius: 0.5rem;
+  overflow: hidden;
 }
 
 .ai-message-content th,
 .ai-message-content td {
-  border: 1px solid #d1d5db;
-  padding: 0.375rem 0.75rem;
+  border: 1px solid #e9d5ff;
+  padding: 0.5rem 0.75rem;
   text-align: left;
   font-size: 0.8125rem;
 }
 
 .ai-message-content th {
-  background-color: #f3f4f6;
+  background-color: #f5f3ff;
   font-weight: 600;
+  color: #5b21b6;
+}
+
+/* Mobile overlay */
+.thread-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 40;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.thread-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.thread-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  max-width: 85vw;
+  z-index: 50;
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.thread-sidebar.open {
+  transform: translateX(0);
 }

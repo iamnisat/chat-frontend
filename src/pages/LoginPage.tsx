@@ -1,22 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { LoginType } from "../types";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [loginType, setLoginType] = useState<LoginType>("user");
-  const [userId, setUserId] = useState("1");
-  const [farmerId, setFarmerId] = useState("1");
-  const [parentId, setParentId] = useState("");
+  const [name, setName] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     const userData = {
-      loginType,
-      userId: loginType === "user" ? parseInt(userId, 10) : undefined,
-      farmerId: loginType === "farmer" ? parseInt(farmerId, 10) : undefined,
-      parentId: parentId ? parseInt(parentId, 10) : undefined,
+      loginType: "farmer",
+      farmerId: Date.now(),
+      userId: undefined,
+      parentId: undefined,
+      name: name.trim(),
     };
 
     localStorage.setItem("chatUser", JSON.stringify(userData));
@@ -24,86 +21,42 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">Chat Login</h1>
-          <p className="text-gray-500 mt-2">Select your identity to continue</p>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "linear-gradient(135deg, #f5f3ff 0%, #fdf2f8 50%, #ede9fe 100%)" }}>
+      <div className="w-full max-w-sm animate-fade-in-up">
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-purple-100/50 border border-purple-100/50 p-8">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-200" style={{ background: "var(--own-gradient)" }}>
+              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 20.105V4.875A1.875 1.875 0 0 1 5.625 3h12.75A1.875 1.875 0 0 1 20.25 4.875v10.5A1.875 1.875 0 0 1 18.375 17.25H7.5l-3.75 2.855Z" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-800">Welcome</h1>
+            <p className="text-sm text-gray-400 mt-1.5">Enter your name to start chatting</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Your Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Rahim Uddin"
+                required
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100 transition-all placeholder:text-gray-300"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3 rounded-xl text-white font-semibold text-sm shadow-lg shadow-purple-200 hover:shadow-xl hover:shadow-purple-300 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+              style={{ background: "var(--own-gradient)" }}
+            >
+              Start Chatting
+            </button>
+          </form>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Login Type</label>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setLoginType("user")}
-                className={`flex-1 py-2 px-4 rounded-lg border-2 font-medium transition-colors ${
-                  loginType === "user"
-                    ? "border-blue-600 bg-blue-50 text-blue-700"
-                    : "border-gray-200 text-gray-600 hover:border-gray-300"
-                }`}
-              >
-                User
-              </button>
-              <button
-                type="button"
-                onClick={() => setLoginType("farmer")}
-                className={`flex-1 py-2 px-4 rounded-lg border-2 font-medium transition-colors ${
-                  loginType === "farmer"
-                    ? "border-green-600 bg-green-50 text-green-700"
-                    : "border-gray-200 text-gray-600 hover:border-gray-300"
-                }`}
-              >
-                Farmer
-              </button>
-            </div>
-          </div>
-
-          {loginType === "user" ? (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">User ID</label>
-              <input
-                type="number"
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-                min="1"
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          ) : (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Farmer ID</label>
-              <input
-                type="number"
-                value={farmerId}
-                onChange={(e) => setFarmerId(e.target.value)}
-                min="1"
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Parent ID (optional)</label>
-            <input
-              type="number"
-              value={parentId}
-              onChange={(e) => setParentId(e.target.value)}
-              min="1"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-          >
-            Start Chatting
-          </button>
-        </form>
+        <p className="text-center text-xs text-gray-300 mt-6">Powered by AI</p>
       </div>
     </div>
   );

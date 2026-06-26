@@ -16,6 +16,7 @@ export interface UserPayload {
   farmer_id?: number;
   login_type?: LoginType;
   parent_id?: number;
+  name?: string;
 }
 
 export interface SendMessagePayload {

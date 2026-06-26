@@ -72,45 +72,58 @@ export function MessageInput({ onSendMessage, onTypingStart, onTypingStop, disab
   const handleInput = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 150)}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   };
 
   const charCount = message.length;
   const isOverLimit = charCount > MAX_CHARS;
-  const isNearLimit = charCount > MAX_CHARS * 0.9;
+  const hasText = message.trim().length > 0;
 
   return (
-    <div className="border-t border-gray-200 bg-white p-4">
-      <div className="flex items-end gap-2">
-        <textarea
-          ref={textareaRef}
-          value={message}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onInput={handleInput}
-          placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
-          disabled={disabled}
-          className="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-          rows={1}
-          maxLength={MAX_CHARS + 100}
-        />
-        <button
-          onClick={handleSend}
-          disabled={disabled || !message.trim() || isOverLimit}
-          className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-        >
-          Send
-        </button>
-      </div>
-      <div className="mt-1 flex justify-end">
-        <span
-          className={`text-xs ${
-            isOverLimit ? "text-red-500 font-semibold" : isNearLimit ? "text-yellow-600" : "text-gray-400"
-          }`}
-        >
-          {charCount}/{MAX_CHARS}
-        </span>
+    <div className="border-t border-purple-100 bg-white px-4 py-3">
+      <div className="max-w-3xl mx-auto">
+        <div className="flex items-end gap-2 bg-gray-50 rounded-2xl border border-gray-200 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-100 transition-all">
+          <textarea
+            ref={textareaRef}
+            value={message}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onInput={handleInput}
+            placeholder="Type a message..."
+            disabled={disabled}
+            className="flex-1 resize-none bg-transparent px-4 py-3 text-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400"
+            rows={1}
+            maxLength={MAX_CHARS + 100}
+          />
+          <button
+            onClick={handleSend}
+            disabled={disabled || !hasText || isOverLimit}
+            className={`m-1.5 p-2.5 rounded-xl transition-all duration-200 ${
+              hasText && !isOverLimit
+                ? "text-white shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}
+            style={
+              hasText && !isOverLimit
+                ? { background: "var(--own-gradient)" }
+                : undefined
+            }
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+            </svg>
+          </button>
+        </div>
+        <div className="mt-1.5 flex justify-end px-1">
+          <span
+            className={`text-[10px] font-medium transition-colors ${
+              isOverLimit ? "text-rose-500" : charCount > MAX_CHARS * 0.9 ? "text-amber-500" : "text-gray-300"
+            }`}
+          >
+            {charCount > 0 ? `${charCount}/${MAX_CHARS}` : ""}
+          </span>
+        </div>
       </div>
     </div>
   );
