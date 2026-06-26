@@ -1,0 +1,24 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/chat-frontend', '.']
+
+  - name: gcr.io/cloud-builders/docker
+    args: ['push', 'gcr.io/$PROJECT_ID/chat-frontend']
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    args:
+      - run
+      - deploy
+      - chat-frontend
+      - --image
+      - gcr.io/$PROJECT_ID/chat-frontend
+      - --region
+      - us-central1
+      - --platform
+      - managed
+      - --allow-unauthenticated
+      - --set-env-vars
+      - VITE_SOCKET_URL=https://chat-middleware-u25qpvjxya-uc.a.run.app
+
+images:
+  - gcr.io/$PROJECT_ID/chat-frontend
