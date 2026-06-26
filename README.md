@@ -69,32 +69,6 @@ docker build -t chat-frontend .
 docker run -p 8080:8080 -e VITE_SOCKET_URL=https://chat-middleware-u25qpvjxya-uc.a.run.app chat-frontend
 ```
 
-## Google Cloud Run Deployment
-
-### Option 1: Using deploy.sh
-
-```bash
-chmod +x deploy.sh
-./deploy.sh
-```
-
-### Option 2: Using gcloud CLI
-
-```bash
-gcloud run deploy chat-frontend \
-  --source . \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars "VITE_SOCKET_URL=https://chat-middleware-u25qpvjxya-uc.a.run.app"
-```
-
-### Option 3: Using Cloud Build
-
-```bash
-gcloud builds submit --config cloudbuild.yaml .
-```
-
 ## Environment Variables
 
 | Variable | Description | Default |
@@ -132,22 +106,31 @@ src/
 
 ## ------------ Google Cloud Platform ------------
 
-# Google Cloud authentication
+### Google Cloud authentication
 
+```bash
 gcloud auth login
-
 gcloud config set project upheld-setting-423215-p7
+```
 
-## Docker Image push to GCloud Artifact Registry
+### Build and Deploy (using cloudbuild.yaml)
 
-gcloud builds submit \
-  --tag us-central1-docker.pkg.dev/upheld-setting-423215-p7/development/chat-frontend
+```bash
+gcloud builds submit --config cloudbuild.yaml .
+```
 
-## Artifact Registry run deploy
+This will:
+1. Build the Docker image with `VITE_SOCKET_URL` as a build arg
+2. Push the image to Google Container Registry
+3. Deploy to Cloud Run with the correct environment
 
+#### Deploy to Cloud Run
+
+```bash
 gcloud run deploy chat-frontend \
---image=us-central1-docker.pkg.dev/upheld-setting-423215-p7/development/chat-frontend \
---port=8080 \
---region=us-central1 \
---allow-unauthenticated \
---platform managed
+  --image=gcr.io/upheld-setting-423215-p7/chat-frontend \
+  --port=8080 \
+  --region=us-central1 \
+  --allow-unauthenticated \
+  --platform managed
+```

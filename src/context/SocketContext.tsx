@@ -33,7 +33,7 @@ export function SocketProvider({ children, userPayload }: { children: ReactNode;
 
     const newSocket = io(SOCKET_URL + "/chat", {
       path: "/socket.io",
-      transports: ["websocket", "polling"],
+      transports: ["polling"],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
