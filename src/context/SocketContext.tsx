@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
 import type { UserPayload, ThreadModule } from "../types";
 
@@ -11,6 +11,7 @@ interface SocketContextType {
   joinThread: (threadModuleId: number) => Promise<boolean>;
   leaveThread: (threadModuleId: number) => Promise<boolean>;
   createThread: (name: string) => Promise<{ success: boolean; data?: ThreadModule; message?: string }>;
+  deleteThread: (threadModuleId: number) => Promise<{ success: boolean; message?: string }>;
   listThreads: () => Promise<{ success: boolean; data?: ThreadModule[]; message?: string }>;
 }
 
@@ -148,7 +149,19 @@ export function SocketProvider({ children, userPayload }: { children: ReactNode;
     });
   };
 
-  const listThreads = (): Promise<{ success: boolean; data?: ThreadModule[]; message?: string }> => {
+  const deleteThread = useCallback((threadModuleId: number): Promise<{ success: boolean; message?: string }> => {
+    return new Promise((resolve) => {
+      if (!socketRef.current) {
+        resolve({ success: false, message: "Not connected" });
+        return;
+      }
+      socketRef.current.emit("thread:delete", { thread_module_id: threadModuleId }, (response: { success: boolean; message?: string }) => {
+        resolve(response);
+      });
+    });
+  }, []);
+
+  const listThreads = useCallback((): Promise<{ success: boolean; data?: ThreadModule[]; message?: string }> => {
     return new Promise((resolve) => {
       if (!socketRef.current) {
         resolve({ success: false, message: "Not connected" });
@@ -158,10 +171,10 @@ export function SocketProvider({ children, userPayload }: { children: ReactNode;
         resolve(response);
       });
     });
-  };
+  }, []);
 
   return (
-    <SocketContext.Provider value={{ socket, isConnected, isReconnecting, socketId, joinUser, joinThread, leaveThread, createThread, listThreads }}>
+    <SocketContext.Provider value={{ socket, isConnected, isReconnecting, socketId, joinUser, joinThread, leaveThread, createThread, deleteThread, listThreads }}>
       {children}
     </SocketContext.Provider>
   );

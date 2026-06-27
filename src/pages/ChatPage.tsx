@@ -14,7 +14,7 @@ function ChatContent() {
   const [selectedThread, setSelectedThread] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [threads, setThreads] = useState<ThreadModule[]>([]);
-  const { joinThread, leaveThread, socket, createThread, listThreads } = useSocketContext();
+  const { joinThread, leaveThread, socket, createThread, deleteThread, listThreads } = useSocketContext();
   const [userData, setUserData] = useState<UserPayload | null>(null);
   const chat = useChat(selectedThread, userData?.login_type === "farmer" ? userData?.farmer_id : userData?.user_id != null ? String(userData.user_id) : undefined, userData?.login_type);
 
@@ -48,13 +48,26 @@ function ChatContent() {
         if (prev.some((t) => t.id === thread.id)) return prev;
         return [...prev, thread];
       });
+      setSelectedThread(thread.id);
+      joinThread(thread.id);
+      setSidebarOpen(false);
+    };
+
+    const handleThreadDeleted = (data: { thread_module_id: number }) => {
+      setThreads((prev) => prev.filter((t) => t.id !== data.thread_module_id));
+      if (selectedThread === data.thread_module_id) {
+        setSelectedThread(null);
+        leaveThread(data.thread_module_id);
+      }
     };
 
     socket.on("thread:created", handleThreadCreated);
+    socket.on("thread:deleted", handleThreadDeleted);
     return () => {
       socket.off("thread:created", handleThreadCreated);
+      socket.off("thread:deleted", handleThreadDeleted);
     };
-  }, [socket, listThreads]);
+  }, [socket, listThreads, joinThread, leaveThread, selectedThread]);
 
   const handleLogout = useCallback(() => {
     socket?.disconnect();
@@ -76,14 +89,16 @@ function ChatContent() {
 
   const handleCreateThread = useCallback(
     async (name: string) => {
-      const result = await createThread(name);
-      if (result.success && result.data) {
-        setSelectedThread(result.data.id);
-        joinThread(result.data.id);
-        setSidebarOpen(false);
-      }
+      await createThread(name);
     },
-    [createThread, joinThread]
+    [createThread]
+  );
+
+  const handleDeleteThread = useCallback(
+    async (threadId: number) => {
+      await deleteThread(threadId);
+    },
+    [deleteThread]
   );
 
   const handleSendMessage = useCallback(
@@ -192,6 +207,7 @@ function ChatContent() {
           selectedThread={selectedThread}
           onSelectThread={handleSelectThread}
           onCreateThread={handleCreateThread}
+          onDeleteThread={handleDeleteThread}
         />
       </div>
 
@@ -204,6 +220,7 @@ function ChatContent() {
             selectedThread={selectedThread}
             onSelectThread={handleSelectThread}
             onCreateThread={handleCreateThread}
+            onDeleteThread={handleDeleteThread}
           />
         </div>
 
