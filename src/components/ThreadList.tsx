@@ -1,9 +1,11 @@
+import { useState, useRef, useEffect } from "react";
 import type { ThreadModule } from "../types";
 
 interface ThreadListProps {
   threads: ThreadModule[];
   selectedThread: number | null;
   onSelectThread: (threadId: number) => void;
+  onCreateThread?: (name: string) => void;
   className?: string;
 }
 
@@ -13,17 +15,98 @@ const THREAD_ICONS: Record<number, string> = {
   300: "M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z",
 };
 
-export function ThreadList({ threads, selectedThread, onSelectThread, className = "" }: ThreadListProps) {
+const DEFAULT_ICON = "M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z";
+
+export function ThreadList({ threads, selectedThread, onSelectThread, onCreateThread, className = "" }: ThreadListProps) {
+  const [isCreating, setIsCreating] = useState(false);
+  const [newThreadName, setNewThreadName] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isCreating) {
+      inputRef.current?.focus();
+    }
+  }, [isCreating]);
+
+  const handleSubmit = () => {
+    const trimmed = newThreadName.trim();
+    if (trimmed && onCreateThread) {
+      onCreateThread(trimmed);
+      setNewThreadName("");
+      setIsCreating(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSubmit();
+    } else if (e.key === "Escape") {
+      setNewThreadName("");
+      setIsCreating(false);
+    }
+  };
+
   return (
     <div className={`flex flex-col h-full ${className}`}>
       <div className="p-5 pb-3">
-        <h2 className="text-base font-bold text-gray-800">Conversations</h2>
-        <p className="text-xs text-gray-400 mt-0.5">{threads.length} threads available</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-gray-800">Conversations</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{threads.length} threads available</p>
+          </div>
+          {onCreateThread && (
+            <button
+              onClick={() => setIsCreating(true)}
+              className="p-2 rounded-xl hover:bg-purple-50 transition-colors text-purple-500 hover:text-purple-600"
+              title="New thread"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
+
+      {isCreating && (
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-2 p-2 bg-white rounded-xl shadow-sm border border-purple-100">
+            <input
+              ref={inputRef}
+              type="text"
+              value={newThreadName}
+              onChange={(e) => setNewThreadName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Thread name..."
+              maxLength={100}
+              className="flex-1 text-sm px-2 py-1 outline-none text-gray-700 placeholder-gray-400"
+            />
+            <button
+              onClick={handleSubmit}
+              disabled={!newThreadName.trim()}
+              className="p-1.5 rounded-lg text-white disabled:opacity-40 transition-opacity"
+              style={{ background: "var(--own-gradient)" }}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </button>
+            <button
+              onClick={() => { setNewThreadName(""); setIsCreating(false); }}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1.5">
         {threads.map((thread, index) => {
           const isSelected = selectedThread === thread.id;
-          const icon = THREAD_ICONS[thread.id] || THREAD_ICONS[300];
+          const icon = THREAD_ICONS[thread.id] || DEFAULT_ICON;
 
           return (
             <button

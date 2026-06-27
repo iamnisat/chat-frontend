@@ -1,9 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("chatUser");
+    if (stored) {
+      navigate("/chat", { replace: true });
+    }
+  }, [navigate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

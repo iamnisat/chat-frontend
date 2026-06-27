@@ -45,6 +45,12 @@ export interface SocketCallback {
 export interface ThreadModule {
   id: number;
   name: string;
+  created_at?: string;
+  created_by?: string;
+}
+
+export interface CreateThreadPayload {
+  name: string;
 }
 
 export interface ChatUser {

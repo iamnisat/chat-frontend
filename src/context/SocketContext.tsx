@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
-import type { UserPayload } from "../types";
+import type { UserPayload, ThreadModule } from "../types";
 
 interface SocketContextType {
   socket: Socket | null;
@@ -10,6 +10,8 @@ interface SocketContextType {
   joinUser: (payload: UserPayload) => Promise<boolean>;
   joinThread: (threadModuleId: number) => Promise<boolean>;
   leaveThread: (threadModuleId: number) => Promise<boolean>;
+  createThread: (name: string) => Promise<{ success: boolean; data?: ThreadModule; message?: string }>;
+  listThreads: () => Promise<{ success: boolean; data?: ThreadModule[]; message?: string }>;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -134,8 +136,32 @@ export function SocketProvider({ children, userPayload }: { children: ReactNode;
     });
   };
 
+  const createThread = (name: string): Promise<{ success: boolean; data?: ThreadModule; message?: string }> => {
+    return new Promise((resolve) => {
+      if (!socketRef.current) {
+        resolve({ success: false, message: "Not connected" });
+        return;
+      }
+      socketRef.current.emit("thread:create", { name }, (response: { success: boolean; message?: string; data?: ThreadModule }) => {
+        resolve(response);
+      });
+    });
+  };
+
+  const listThreads = (): Promise<{ success: boolean; data?: ThreadModule[]; message?: string }> => {
+    return new Promise((resolve) => {
+      if (!socketRef.current) {
+        resolve({ success: false, message: "Not connected" });
+        return;
+      }
+      socketRef.current.emit("thread:list", (response: { success: boolean; data?: ThreadModule[]; message?: string }) => {
+        resolve(response);
+      });
+    });
+  };
+
   return (
-    <SocketContext.Provider value={{ socket, isConnected, isReconnecting, socketId, joinUser, joinThread, leaveThread }}>
+    <SocketContext.Provider value={{ socket, isConnected, isReconnecting, socketId, joinUser, joinThread, leaveThread, createThread, listThreads }}>
       {children}
     </SocketContext.Provider>
   );

@@ -9,17 +9,12 @@ import { useChat } from "../hooks/useChat";
 import { useSocketContext } from "../context/SocketContext";
 import type { ThreadModule, UserPayload } from "../types";
 
-const MOCK_THREADS: ThreadModule[] = [
-  { id: 100, name: "General Support" },
-  { id: 200, name: "Technical Help" },
-  { id: 300, name: "Feedback" },
-];
-
 function ChatContent() {
   const navigate = useNavigate();
   const [selectedThread, setSelectedThread] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { joinThread, leaveThread, socket } = useSocketContext();
+  const [threads, setThreads] = useState<ThreadModule[]>([]);
+  const { joinThread, leaveThread, socket, createThread, listThreads } = useSocketContext();
   const [userData, setUserData] = useState<UserPayload | null>(null);
   const chat = useChat(selectedThread, userData?.login_type === "farmer" ? userData?.farmer_id : userData?.user_id != null ? String(userData.user_id) : undefined, userData?.login_type);
 
@@ -39,6 +34,28 @@ function ChatContent() {
     });
   }, [navigate]);
 
+  useEffect(() => {
+    if (!socket) return;
+
+    listThreads().then((response) => {
+      if (response.success && response.data) {
+        setThreads(response.data);
+      }
+    });
+
+    const handleThreadCreated = (thread: ThreadModule) => {
+      setThreads((prev) => {
+        if (prev.some((t) => t.id === thread.id)) return prev;
+        return [...prev, thread];
+      });
+    };
+
+    socket.on("thread:created", handleThreadCreated);
+    return () => {
+      socket.off("thread:created", handleThreadCreated);
+    };
+  }, [socket, listThreads]);
+
   const handleLogout = useCallback(() => {
     socket?.disconnect();
     localStorage.removeItem("chatUser");
@@ -55,6 +72,18 @@ function ChatContent() {
       setSidebarOpen(false);
     },
     [selectedThread, joinThread, leaveThread]
+  );
+
+  const handleCreateThread = useCallback(
+    async (name: string) => {
+      const result = await createThread(name);
+      if (result.success && result.data) {
+        setSelectedThread(result.data.id);
+        joinThread(result.data.id);
+        setSidebarOpen(false);
+      }
+    },
+    [createThread, joinThread]
   );
 
   const handleSendMessage = useCallback(
@@ -82,7 +111,7 @@ function ChatContent() {
 
   if (!userData) return null;
 
-  const selectedThreadName = MOCK_THREADS.find((t) => t.id === selectedThread)?.name || "";
+  const selectedThreadName = threads.find((t) => t.id === selectedThread)?.name || "";
 
   return (
     <div className="h-dvh flex flex-col bg-gray-50">
@@ -159,9 +188,10 @@ function ChatContent() {
           </button>
         </div>
         <ThreadList
-          threads={MOCK_THREADS}
+          threads={threads}
           selectedThread={selectedThread}
           onSelectThread={handleSelectThread}
+          onCreateThread={handleCreateThread}
         />
       </div>
 
@@ -170,9 +200,10 @@ function ChatContent() {
         {/* Desktop sidebar */}
         <div className="hidden md:block w-72 border-r border-purple-100 bg-white flex-shrink-0">
           <ThreadList
-            threads={MOCK_THREADS}
+            threads={threads}
             selectedThread={selectedThread}
             onSelectThread={handleSelectThread}
+            onCreateThread={handleCreateThread}
           />
         </div>
 
