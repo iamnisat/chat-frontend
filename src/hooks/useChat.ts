@@ -274,12 +274,20 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
             (raw.name as string) ??
             (resolvedSenderType === "ai_agent" ? "Aunkur AI" : "Farmer");
 
+          const rawCreatedAt = raw.created_at ?? raw.createdAt;
+          const createdAt = typeof rawCreatedAt === "number"
+            ? new Date(rawCreatedAt).toISOString()
+            : typeof rawCreatedAt === "string"
+            ? rawCreatedAt
+            : new Date().toISOString();
+
           return [...prev, {
             ...message,
             sender_type: resolvedSenderType,
             sender_name: senderName,
             farmer_id: normalizedFarmerId,
             user_id: normalizedUserId,
+            created_at: createdAt,
           }];
         });
       }
@@ -335,10 +343,6 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
       socket.off("message:deleted", handleMessageDeleted);
     };
   }, [socket, threadModuleId, currentUserId, currentUserType, token]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
 
   const sendMessage = useCallback(
     (payload: Omit<SendMessagePayload, "thread_module_id"> & { thread_module_id?: number }) => {

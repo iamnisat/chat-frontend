@@ -17,6 +17,7 @@ interface ChatWindowProps {
 
 export function ChatWindow({ messages, currentUserId, currentUserType, isTyping, typingUser, messagesEndRef, hasMorePages, isLoadingMore, onLoadMore }: ChatWindowProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const hasInitiallyLoaded = useRef(false);
 
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -28,8 +29,17 @@ export function ChatWindow({ messages, currentUserId, currentUserType, isTyping,
   }, [isLoadingMore, hasMorePages, onLoadMore]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping, messagesEndRef]);
+    if (messages.length === 0) {
+      hasInitiallyLoaded.current = false;
+      return;
+    }
+    if (!hasInitiallyLoaded.current) {
+      hasInitiallyLoaded.current = true;
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+      });
+    }
+  }, [messages, messagesEndRef]);
 
   return (
     <div
