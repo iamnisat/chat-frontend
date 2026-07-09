@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import type { MessageResponse } from "../types";
 import { MessageBubble } from "./MessageBubble";
 import { TypingIndicator } from "./TypingIndicator";
@@ -10,16 +10,35 @@ interface ChatWindowProps {
   isTyping: boolean;
   typingUser: string;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
+  hasMorePages: boolean;
+  isLoadingMore: boolean;
+  onLoadMore: () => void;
 }
 
-export function ChatWindow({ messages, currentUserId, currentUserType, isTyping, typingUser, messagesEndRef }: ChatWindowProps) {
+export function ChatWindow({ messages, currentUserId, currentUserType, isTyping, typingUser, messagesEndRef, hasMorePages, isLoadingMore, onLoadMore }: ChatWindowProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container || isLoadingMore || !hasMorePages) return;
+
+    if (container.scrollTop < 80) {
+      onLoadMore();
+    }
+  }, [isLoadingMore, hasMorePages, onLoadMore]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping, messagesEndRef]);
 
   return (
-    <div className="h-full overflow-y-auto px-4 py-6" style={{ background: "var(--surface)" }}>
-      {messages.length === 0 ? (
+    <div
+      ref={scrollContainerRef}
+      onScroll={handleScroll}
+      className="h-full overflow-y-auto px-4 py-6 chat-scroll-container"
+      style={{ background: "var(--surface)" }}
+    >
+      {messages.length === 0 && !isLoadingMore ? (
         <div className="flex items-center justify-center h-full">
           <div className="text-center animate-float">
             <div className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f3e8ff 0%, #fce7f3 100%)" }}>
@@ -33,6 +52,22 @@ export function ChatWindow({ messages, currentUserId, currentUserType, isTyping,
         </div>
       ) : (
         <div className="space-y-1 max-w-3xl mx-auto">
+          {isLoadingMore && (
+            <div className="flex justify-center py-3">
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Loading earlier messages...
+              </div>
+            </div>
+          )}
+          {!isLoadingMore && hasMorePages && (
+            <div className="text-center py-2">
+              <span className="text-xs text-gray-300">Scroll up for more</span>
+            </div>
+          )}
           {messages.map((msg) => (
             <MessageBubble
               key={msg.id}

@@ -1,5 +1,12 @@
 export type LoginType = "farmer" | "user";
 
+export interface MessageSender {
+  id: number;
+  name: string;
+  images?: string;
+  base_image?: string;
+}
+
 export interface MessageResponse {
   id: string;
   thread_module_id: number;
@@ -9,6 +16,9 @@ export interface MessageResponse {
   sender_type: LoginType | "ai_agent";
   sender_name: string;
   created_at: string;
+  images?: string[];
+  user?: MessageSender | null;
+  farmer?: MessageSender | null;
 }
 
 export interface UserPayload {
@@ -17,6 +27,8 @@ export interface UserPayload {
   login_type?: LoginType;
   parent_id?: number;
   name?: string;
+  token?: string;
+  base_image?: string;
 }
 
 export interface SendMessagePayload {
@@ -47,6 +59,18 @@ export interface ThreadModule {
   name: string;
   created_at?: string;
   created_by?: string;
+  last_message?: string;
+  last_date_time?: number;
+  is_seen?: boolean;
+  conv_name?: string;
+  thread?: {
+    id: number;
+    land: string | null;
+    crop: string | null;
+    year: string | null;
+    type: string;
+    season: number | null;
+  };
 }
 
 export interface CreateThreadPayload {

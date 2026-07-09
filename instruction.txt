@@ -1,0 +1,24 @@
+REQUEST 
+[POST] https://fusion.aunkur.ai/api/v1/messages/advisory
+ │ Token: eyJhbGciOiJIUzI1NiIs...
+ │ Body: {
+   "type": "general",
+   "farmer_id": 50591,
+   "reference_type": "farmer"
+ }
+
+
+ │ RESPONSE 
+ [POST] /api/v1/messages/advisory
+ │ Status: 200
+ │ Data: {
+   "success": true,
+   "message": "Advisory request already exists",
+   "data": {
+     "id": 17,
+     "farming_thread_id": 50591,
+     "type": "general"
+   }
+ }
+
+use this api to create new conversation thread. once created refresh the thread list and open the conversation window by passing the thread id under Data->id

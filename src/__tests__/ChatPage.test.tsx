@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { LoginPage } from "../pages/LoginPage";
 
@@ -18,6 +18,10 @@ describe("LoginPage", () => {
     localStorage.clear();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("renders login form", () => {
     render(
       <BrowserRouter>
@@ -25,43 +29,124 @@ describe("LoginPage", () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText("Chat Login")).toBeInTheDocument();
-    expect(screen.getByText("User")).toBeInTheDocument();
-    expect(screen.getByText("Farmer")).toBeInTheDocument();
-    expect(screen.getByText("Start Chatting")).toBeInTheDocument();
+    expect(screen.getByText("Welcome")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mobile Number")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign In" })).toBeInTheDocument();
   });
 
-  it("allows selecting login type", () => {
+  it("navigates to chat on successful login", async () => {
+    const mockResponse = {
+      success: true,
+      message: "Login successful",
+      data: {
+        success: true,
+        message: "Login Successfull!",
+        token: "mock-token",
+        data: {
+          id: 50591,
+          name: "Farmer A",
+          mobile: "(+88) 01799-999-444",
+          base_image: "test.jpg",
+          nid: "123456",
+          settings: {},
+        },
+      },
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      json: async () => mockResponse,
+    } as Response);
+
     render(
       <BrowserRouter>
         <LoginPage />
       </BrowserRouter>
     );
 
-    fireEvent.click(screen.getByText("Farmer"));
-    expect(screen.getByText("Farmer ID")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Mobile Number"), {
+      target: { value: "(+88) 01799-999-444" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "Hello@123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith("/chat");
+    });
   });
 
-  it("navigates to chat on form submission", () => {
+  it("stores user data in localStorage on successful login", async () => {
+    const mockResponse = {
+      success: true,
+      data: {
+        success: true,
+        token: "mock-token",
+        data: {
+          id: 50591,
+          name: "Farmer A",
+          mobile: "(+88) 01799-999-444",
+          base_image: "test.jpg",
+          nid: "123456",
+          settings: {},
+        },
+      },
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      json: async () => mockResponse,
+    } as Response);
+
     render(
       <BrowserRouter>
         <LoginPage />
       </BrowserRouter>
     );
 
-    fireEvent.click(screen.getByText("Start Chatting"));
-    expect(mockNavigate).toHaveBeenCalledWith("/chat");
+    fireEvent.change(screen.getByLabelText("Mobile Number"), {
+      target: { value: "(+88) 01799-999-444" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "Hello@123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem("chatUser") || "{}");
+      expect(stored.loginType).toBe("farmer");
+      expect(stored.farmerId).toBe("50591");
+      expect(stored.name).toBe("Farmer A");
+      expect(stored.token).toBe("mock-token");
+    });
   });
 
-  it("stores user data in localStorage", () => {
+  it("shows error message on failed login", async () => {
+    const mockResponse = {
+      success: false,
+      message: "Invalid credentials",
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      json: async () => mockResponse,
+    } as Response);
+
     render(
       <BrowserRouter>
         <LoginPage />
       </BrowserRouter>
     );
 
-    fireEvent.click(screen.getByText("Start Chatting"));
-    const stored = JSON.parse(localStorage.getItem("chatUser") || "{}");
-    expect(stored.loginType).toBe("user");
+    fireEvent.change(screen.getByLabelText("Mobile Number"), {
+      target: { value: "wrong" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "wrong" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Invalid credentials")).toBeInTheDocument();
+    });
   });
 });

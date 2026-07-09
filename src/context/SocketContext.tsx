@@ -29,12 +29,12 @@ export function SocketProvider({ children, userPayload }: { children: ReactNode;
   userPayloadRef.current = userPayload;
 
   useEffect(() => {
-    console.log("[Socket] Connecting to:", SOCKET_URL + "/chat");
+    console.log("[Socket] Connecting to:", SOCKET_URL);
 
     const IS_DEV = import.meta.env.VITE_APP_ENV !== "production";
-    console.log("[Socket] Connecting to:", SOCKET_URL + "/chat", "| transport:", IS_DEV ? "polling" : "websocket+polling");
+    console.log("[Socket] Connecting to:", SOCKET_URL, "| transport:", IS_DEV ? "polling" : "websocket+polling");
 
-    const newSocket = io(SOCKET_URL + "/chat", {
+    const newSocket = io(SOCKET_URL, {
       path: "/socket.io",
       transports: ["polling"],
       reconnection: true,

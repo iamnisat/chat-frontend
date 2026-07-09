@@ -7,16 +7,21 @@ import { MessageInput } from "../components/MessageInput";
 import { ConnectionStatus } from "../components/ConnectionStatus";
 import { useChat } from "../hooks/useChat";
 import { useSocketContext } from "../context/SocketContext";
+import { fetchConversations, createAdvisory } from "../api";
 import type { ThreadModule, UserPayload } from "../types";
+
+const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "";
+const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23a78bfa'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='16' font-weight='bold' font-family='system-ui'%3EU%3C/text%3E%3C/svg%3E";
 
 function ChatContent() {
   const navigate = useNavigate();
   const [selectedThread, setSelectedThread] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [threads, setThreads] = useState<ThreadModule[]>([]);
-  const { joinThread, leaveThread, socket, createThread, deleteThread, listThreads } = useSocketContext();
+  const [isCreatingThread, setIsCreatingThread] = useState(false);
+  const { joinThread, leaveThread, socket, deleteThread } = useSocketContext();
   const [userData, setUserData] = useState<UserPayload | null>(null);
-  const chat = useChat(selectedThread, userData?.login_type === "farmer" ? userData?.farmer_id : userData?.user_id != null ? String(userData.user_id) : undefined, userData?.login_type);
+  const chat = useChat(selectedThread, userData?.login_type === "farmer" ? userData?.farmer_id : userData?.user_id != null ? String(userData.user_id) : undefined, userData?.login_type, userData?.token);
 
   useEffect(() => {
     const stored = localStorage.getItem("chatUser");
@@ -31,17 +36,28 @@ function ChatContent() {
       login_type: parsed.loginType,
       parent_id: parsed.parentId,
       name: parsed.name,
+      token: parsed.token,
+      base_image: parsed.baseImage,
     });
   }, [navigate]);
 
   useEffect(() => {
-    if (!socket) return;
+    if (!userData?.token) return;
 
-    listThreads().then((response) => {
-      if (response.success && response.data) {
-        setThreads(response.data);
+    fetchConversations(userData.token).then((json) => {
+      if (json.success && json.data) {
+        const mapped: ThreadModule[] = json.data.map((c: { id: number; conv_name: string; last_message?: string; last_date_time?: number; is_seen?: boolean }) => ({
+          id: c.id,
+          name: c.conv_name,
+          last_message: c.last_message,
+          last_date_time: c.last_date_time,
+          is_seen: c.is_seen,
+        }));
+        setThreads(mapped);
       }
     });
+
+    if (!socket) return;
 
     const handleThreadCreated = (thread: ThreadModule) => {
       setThreads((prev) => {
@@ -67,7 +83,7 @@ function ChatContent() {
       socket.off("thread:created", handleThreadCreated);
       socket.off("thread:deleted", handleThreadDeleted);
     };
-  }, [socket, listThreads, joinThread, leaveThread, selectedThread]);
+  }, [socket, joinThread, leaveThread, selectedThread, userData]);
 
   const handleLogout = useCallback(() => {
     socket?.disconnect();
@@ -87,12 +103,36 @@ function ChatContent() {
     [selectedThread, joinThread, leaveThread]
   );
 
-  const handleCreateThread = useCallback(
-    async (name: string) => {
-      await createThread(name);
-    },
-    [createThread]
-  );
+  const refreshThreads = useCallback(async () => {
+    if (!userData?.token) return;
+    const json = await fetchConversations(userData.token);
+    if (json.success && json.data) {
+      const mapped: ThreadModule[] = json.data.map((c: { id: number; conv_name: string; last_message?: string; last_date_time?: number; is_seen?: boolean }) => ({
+        id: c.id,
+        name: c.conv_name,
+        last_message: c.last_message,
+        last_date_time: c.last_date_time,
+        is_seen: c.is_seen,
+      }));
+      setThreads(mapped);
+    }
+  }, [userData?.token]);
+
+  const handleCreateThread = useCallback(async () => {
+    if (!userData?.token || !userData?.farmer_id || isCreatingThread) return;
+    setIsCreatingThread(true);
+    try {
+      const json = await createAdvisory(userData.token, Number(userData.farmer_id));
+      if (json.success && json.data?.id) {
+        await refreshThreads();
+        setSelectedThread(json.data.id);
+        joinThread(json.data.id);
+        setSidebarOpen(false);
+      }
+    } finally {
+      setIsCreatingThread(false);
+    }
+  }, [userData, isCreatingThread, refreshThreads, joinThread]);
 
   const handleDeleteThread = useCallback(
     async (threadId: number) => {
@@ -144,10 +184,19 @@ function ChatContent() {
               </svg>
             </button>
             <div className="relative flex-shrink-0">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white shadow-md"
-                   style={{ background: "var(--own-gradient)" }}>
-                {userData.name?.charAt(0).toUpperCase() || "U"}
-              </div>
+              {userData.base_image ? (
+                <img
+                  src={`${IMAGE_BASE_URL}/${userData.base_image}`}
+                  alt={userData.name || "User"}
+                  className="w-10 h-10 rounded-xl object-cover shadow-md"
+                  onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }}
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white shadow-md"
+                     style={{ background: "var(--own-gradient)" }}>
+                  {userData.name?.charAt(0).toUpperCase() || "U"}
+                </div>
+              )}
               <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 border-2 border-white rounded-full"></span>
             </div>
             <div className="min-w-0">
@@ -208,6 +257,7 @@ function ChatContent() {
           onSelectThread={handleSelectThread}
           onCreateThread={handleCreateThread}
           onDeleteThread={handleDeleteThread}
+          isCreatingThread={isCreatingThread}
         />
       </div>
 
@@ -221,6 +271,7 @@ function ChatContent() {
             onSelectThread={handleSelectThread}
             onCreateThread={handleCreateThread}
             onDeleteThread={handleDeleteThread}
+            isCreatingThread={isCreatingThread}
           />
         </div>
 
@@ -236,6 +287,9 @@ function ChatContent() {
                   isTyping={chat.isTyping}
                   typingUser={chat.typingUser}
                   messagesEndRef={chat.messagesEndRef}
+                  hasMorePages={chat.hasMorePages}
+                  isLoadingMore={chat.isLoadingMore}
+                  onLoadMore={chat.loadMore}
                 />
               </div>
               <MessageInput
@@ -280,6 +334,8 @@ export function ChatPage() {
       login_type: parsed.loginType,
       parent_id: parsed.parentId,
       name: parsed.name,
+      token: parsed.token,
+      base_image: parsed.baseImage,
     });
   }, [navigate]);
 

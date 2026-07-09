@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSocketContext } from "../context/SocketContext";
+import { fetchMessages } from "../api";
 import type { MessageResponse, SendMessagePayload, LoginType } from "../types";
 
 function normalizeHistoricalMessage(
@@ -104,36 +105,120 @@ function normalizeHistoricalMessage(
   return message;
 }
 
-export function useChat(threadModuleId: number | null, currentUserId?: string, currentUserType?: LoginType) {
+export function useChat(threadModuleId: number | null, currentUserId?: string, currentUserType?: LoginType, token?: string) {
   const { socket, isConnected } = useSocketContext();
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState<string>("");
+  const [hasMorePages, setHasMorePages] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef(1);
+  const isLoadingMoreRef = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
+  const loadMore = useCallback(() => {
+    if (!token || !threadModuleId || isLoadingMoreRef.current || !hasMorePages) return;
+
+    isLoadingMoreRef.current = true;
+    setIsLoadingMore(true);
+
+    const nextPage = pageRef.current + 1;
+    const container = document.querySelector(".chat-scroll-container");
+    const prevScrollHeight = container?.scrollHeight ?? 0;
+
+    fetchMessages(token, threadModuleId, nextPage).then((json) => {
+      if (json.success && json.data) {
+        const normalized: MessageResponse[] = json.data.map((msg: Record<string, unknown>) => {
+          const senderType = msg.user ? "ai_agent" : "farmer";
+          const senderUser = msg.user as { id: number; name: string; images?: string } | null;
+          const senderFarmer = msg.farmer as { id: number; name: string; base_image?: string } | null;
+
+          return {
+            id: String(msg.id ?? `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
+            thread_module_id: threadModuleId,
+            message: (msg.message as string) ?? "",
+            user_id: senderUser?.id ?? null,
+            farmer_id: senderFarmer ? String(senderFarmer.id) : null,
+            sender_type: senderType as "ai_agent" | "farmer",
+            sender_name: senderUser?.name ?? senderFarmer?.name ?? "Unknown",
+            created_at: msg.createdAt ? new Date(msg.createdAt as number).toISOString() : new Date().toISOString(),
+            images: (msg.images as string[]) ?? [],
+            user: senderUser,
+            farmer: senderFarmer,
+          };
+        });
+
+        pageRef.current = nextPage;
+        setHasMorePages(json.paginatorInfo?.hasMorePages ?? false);
+        setMessages((prev) => [...normalized, ...prev]);
+
+        requestAnimationFrame(() => {
+          const newScrollHeight = container?.scrollHeight ?? 0;
+          if (container) {
+            container.scrollTop = newScrollHeight - prevScrollHeight;
+          }
+        });
+      }
+      isLoadingMoreRef.current = false;
+      setIsLoadingMore(false);
+    });
+  }, [token, threadModuleId, hasMorePages]);
+
   useEffect(() => {
-    if (!socket || !threadModuleId) {
+    if (!threadModuleId) {
       setMessages([]);
       return;
     }
 
     setMessages([]);
 
-    socket.emit("message:history", { thread_module_id: threadModuleId }, (response: { success: boolean; data?: MessageResponse[]; message?: string }) => {
-      if (response.success && response.data) {
-        const normalized = currentUserId != null && currentUserType != null
-          ? response.data.map((msg) =>
-              normalizeHistoricalMessage(msg as unknown as Record<string, unknown>, currentUserId, currentUserType)
-            )
-          : response.data;
-        setMessages(normalized);
-        setTimeout(scrollToBottom, 50);
-      }
-    });
+    if (token) {
+      fetchMessages(token, threadModuleId).then((json) => {
+        if (json.success && json.data) {
+          const normalized: MessageResponse[] = json.data.map((msg: Record<string, unknown>) => {
+            const senderType = msg.user ? "ai_agent" : "farmer";
+            const senderUser = msg.user as { id: number; name: string; images?: string } | null;
+            const senderFarmer = msg.farmer as { id: number; name: string; base_image?: string } | null;
+
+            return {
+              id: String(msg.id ?? `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
+              thread_module_id: threadModuleId,
+              message: (msg.message as string) ?? "",
+              user_id: senderUser?.id ?? null,
+              farmer_id: senderFarmer ? String(senderFarmer.id) : null,
+              sender_type: senderType as "ai_agent" | "farmer",
+              sender_name: senderUser?.name ?? senderFarmer?.name ?? "Unknown",
+              created_at: msg.createdAt ? new Date(msg.createdAt as number).toISOString() : new Date().toISOString(),
+              images: (msg.images as string[]) ?? [],
+              user: senderUser,
+              farmer: senderFarmer,
+            };
+          });
+          pageRef.current = 1;
+          setHasMorePages(json.paginatorInfo?.hasMorePages ?? false);
+          setMessages(normalized);
+          setTimeout(scrollToBottom, 50);
+        }
+      });
+    } else if (socket) {
+      socket.emit("message:history", { thread_module_id: threadModuleId }, (response: { success: boolean; data?: MessageResponse[]; message?: string }) => {
+        if (response.success && response.data) {
+          const normalized = currentUserId != null && currentUserType != null
+            ? response.data.map((msg) =>
+                normalizeHistoricalMessage(msg as unknown as Record<string, unknown>, currentUserId, currentUserType)
+              )
+            : response.data;
+          setMessages(normalized);
+          setTimeout(scrollToBottom, 50);
+        }
+      });
+    }
+
+    if (!socket) return () => {};
 
     const handleNewMessage = (message: MessageResponse) => {
       if (message.thread_module_id === threadModuleId) {
@@ -141,7 +226,61 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
           if (prev.some((m) => m.id === message.id)) {
             return prev;
           }
-          return [...prev, message];
+
+          const raw = message as unknown as Record<string, unknown>;
+          const senderType = (
+            (raw.sender_type as string) ??
+            (raw.senderType as string) ??
+            (raw.role as string) ??
+            ""
+          ).toLowerCase();
+
+          const isAiMessage =
+            senderType === "ai_agent" ||
+            senderType === "ai" ||
+            senderType === "assistant" ||
+            senderType === "agent";
+
+          let resolvedSenderType: "farmer" | "user" | "ai_agent";
+          if (isAiMessage) {
+            resolvedSenderType = "ai_agent";
+          } else if (senderType === "farmer" || senderType === "user") {
+            resolvedSenderType = senderType as "farmer" | "user";
+          } else if (currentUserType === "farmer") {
+            resolvedSenderType = "farmer";
+          } else {
+            resolvedSenderType = "user";
+          }
+
+          const rawFarmerId =
+            raw.farmer_id ??
+            raw.farmerId ??
+            (resolvedSenderType === "farmer" ? (raw.sender_id ?? raw.senderId) : null);
+          const rawUserId =
+            raw.user_id ??
+            raw.userId ??
+            (resolvedSenderType === "user" ? (raw.sender_id ?? raw.senderId) : null);
+
+          const normalizedFarmerId = resolvedSenderType === "farmer" && currentUserType === "farmer" && currentUserId
+            ? currentUserId
+            : rawFarmerId != null ? String(rawFarmerId) : null;
+          const normalizedUserId = resolvedSenderType === "user" && currentUserType === "user" && currentUserId
+            ? Number(currentUserId)
+            : rawUserId != null ? Number(rawUserId) : null;
+
+          const senderName =
+            (raw.sender_name as string) ??
+            (raw.senderName as string) ??
+            (raw.name as string) ??
+            (resolvedSenderType === "ai_agent" ? "Aunkur AI" : "Farmer");
+
+          return [...prev, {
+            ...message,
+            sender_type: resolvedSenderType,
+            sender_name: senderName,
+            farmer_id: normalizedFarmerId,
+            user_id: normalizedUserId,
+          }];
         });
       }
     };
@@ -195,7 +334,7 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
       socket.off("message:updated", handleMessageUpdated);
       socket.off("message:deleted", handleMessageDeleted);
     };
-  }, [socket, threadModuleId, currentUserId, currentUserType]);
+  }, [socket, threadModuleId, currentUserId, currentUserType, token]);
 
   useEffect(() => {
     scrollToBottom();
@@ -253,10 +392,13 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
     messages,
     isTyping,
     typingUser,
+    hasMorePages,
+    isLoadingMore,
     sendMessage,
     markSeen,
     emitTypingStart,
     emitTypingStop,
+    loadMore,
     messagesEndRef,
   };
 }

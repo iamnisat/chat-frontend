@@ -1,13 +1,21 @@
-import { useState, useRef, useEffect } from "react";
+import { type RefObject } from "react";
 import type { ThreadModule } from "../types";
+
+function stripHtml(html: string): string {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent || div.innerText || "";
+}
 
 interface ThreadListProps {
   threads: ThreadModule[];
   selectedThread: number | null;
   onSelectThread: (threadId: number) => void;
-  onCreateThread?: (name: string) => void;
+  onCreateThread?: () => void;
   onDeleteThread?: (threadId: number) => void;
   className?: string;
+  isCreatingThread?: boolean;
+  createButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 const THREAD_ICONS: Record<number, string> = {
@@ -18,35 +26,7 @@ const THREAD_ICONS: Record<number, string> = {
 
 const DEFAULT_ICON = "M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z";
 
-export function ThreadList({ threads, selectedThread, onSelectThread, onCreateThread, onDeleteThread, className = "" }: ThreadListProps) {
-  const [isCreating, setIsCreating] = useState(false);
-  const [newThreadName, setNewThreadName] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isCreating) {
-      inputRef.current?.focus();
-    }
-  }, [isCreating]);
-
-  const handleSubmit = () => {
-    const trimmed = newThreadName.trim();
-    if (trimmed && onCreateThread) {
-      onCreateThread(trimmed);
-      setNewThreadName("");
-      setIsCreating(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSubmit();
-    } else if (e.key === "Escape") {
-      setNewThreadName("");
-      setIsCreating(false);
-    }
-  };
-
+export function ThreadList({ threads, selectedThread, onSelectThread, onCreateThread, onDeleteThread, className = "", isCreatingThread, createButtonRef }: ThreadListProps) {
   const handleDelete = (e: React.MouseEvent, threadId: number) => {
     e.stopPropagation();
     if (onDeleteThread && window.confirm("Delete this thread?")) {
@@ -64,52 +44,26 @@ export function ThreadList({ threads, selectedThread, onSelectThread, onCreateTh
           </div>
           {onCreateThread && (
             <button
-              onClick={() => setIsCreating(true)}
-              className="p-2 rounded-xl hover:bg-purple-50 transition-colors text-purple-500 hover:text-purple-600"
-              title="New thread"
+              ref={createButtonRef}
+              onClick={onCreateThread}
+              disabled={isCreatingThread}
+              className="p-2 rounded-xl hover:bg-purple-50 transition-colors text-purple-500 hover:text-purple-600 disabled:opacity-50"
+              title="New conversation"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
+              {isCreatingThread ? (
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              )}
             </button>
           )}
         </div>
       </div>
-
-      {isCreating && (
-        <div className="px-3 pb-2">
-          <div className="flex items-center gap-2 p-2 bg-white rounded-xl shadow-sm border border-purple-100">
-            <input
-              ref={inputRef}
-              type="text"
-              value={newThreadName}
-              onChange={(e) => setNewThreadName(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Thread name..."
-              maxLength={100}
-              className="flex-1 text-sm px-2 py-1 outline-none text-gray-700 placeholder-gray-400"
-            />
-            <button
-              onClick={handleSubmit}
-              disabled={!newThreadName.trim()}
-              className="p-1.5 rounded-lg text-white disabled:opacity-40 transition-opacity"
-              style={{ background: "var(--own-gradient)" }}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-            </button>
-            <button
-              onClick={() => { setNewThreadName(""); setIsCreating(false); }}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1.5">
         {threads.map((thread, index) => {
@@ -154,7 +108,9 @@ export function ThreadList({ threads, selectedThread, onSelectThread, onCreateTh
                   <div className={`text-sm font-semibold truncate ${isSelected ? "text-purple-700" : "text-gray-700"}`}>
                     {thread.name}
                   </div>
-                  <div className="text-xs text-gray-400 mt-0.5">Thread #{thread.id}</div>
+                  {thread.last_message && (
+                    <div className="text-xs text-gray-400 mt-0.5 truncate">{stripHtml(thread.last_message)}</div>
+                  )}
                 </div>
                 {onDeleteThread && (
                   <button
