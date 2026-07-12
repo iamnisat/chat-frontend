@@ -1,7 +1,7 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -10,7 +10,7 @@ export default defineConfig({
     host: true,
     proxy: {
       "/chat/socket.io": {
-        target: "https://chat-middleware-u25qpvjxya-uc.a.run.app",
+        target: "https://deploy.farminsight.dev",
         changeOrigin: true,
         ws: false,
         rewrite: (path) => path.replace(/^\/chat/, ""),

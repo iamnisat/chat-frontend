@@ -66,15 +66,15 @@ docker build -t chat-frontend .
 ### Run Container
 
 ```bash
-docker run -p 8080:8080 -e VITE_SOCKET_URL=https://chat-middleware-u25qpvjxya-uc.a.run.app chat-frontend
+docker run -p 8080:8080 -e VITE_SOCKET_URL=https://deploy.farminsight.dev chat-frontend
 ```
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_SOCKET_URL` | Backend Socket.IO server URL | `http://localhost:8080` |
-| `VITE_APP_ENV` | Environment (development/production) | `development` |
+| Variable          | Description                          | Default                 |
+| ----------------- | ------------------------------------ | ----------------------- |
+| `VITE_SOCKET_URL` | Backend Socket.IO server URL         | `http://localhost:8080` |
+| `VITE_APP_ENV`    | Environment (development/production) | `development`           |
 
 ## Project Structure
 
@@ -103,7 +103,6 @@ src/
     └── SocketContext.test.tsx
 ```
 
-
 ## ------------ Google Cloud Platform ------------
 
 ### Google Cloud authentication
@@ -120,6 +119,7 @@ gcloud builds submit --config cloudbuild.yaml .
 ```
 
 This will:
+
 1. Build the Docker image with `VITE_SOCKET_URL` as a build arg
 2. Push the image to Google Container Registry
 3. Deploy to Cloud Run with the correct environment

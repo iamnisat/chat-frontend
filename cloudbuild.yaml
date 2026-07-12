@@ -3,13 +3,13 @@ steps:
     args:
       - build
       - --build-arg
-      - VITE_SOCKET_URL=https://chat-middleware-u25qpvjxya-uc.a.run.app
+      - VITE_SOCKET_URL=https://deploy.farminsight.dev
       - -t
       - gcr.io/$PROJECT_ID/chat-frontend:latest
       - .
 
   - name: gcr.io/cloud-builders/docker
-    args: ['push', 'gcr.io/$PROJECT_ID/chat-frontend:latest']
+    args: ["push", "gcr.io/$PROJECT_ID/chat-frontend:latest"]
 
   - name: gcr.io/cloud-builders/gcloud
     args:

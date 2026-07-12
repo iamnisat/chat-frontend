@@ -8,6 +8,6 @@ gcloud run deploy chat-frontend \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars "VITE_SOCKET_URL=https://chat-middleware-u25qpvjxya-uc.a.run.app"
+  --set-env-vars "VITE_SOCKET_URL=https://deploy.farminsight.dev"
 
 echo "Deployment complete!"

@@ -91,9 +91,9 @@ function normalizeHistoricalMessage(
       : `User ${normalizedUserId ?? "unknown"}`);
 
   const message: MessageResponse = {
-    id:
-      (raw.id as string) ??
-      `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: String(
+      raw.id ?? `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    ),
     thread_module_id: (raw.thread_module_id as number) ?? 0,
     message: ((raw.message as string) ??
       (raw.text as string) ??
@@ -281,7 +281,8 @@ export function useChat(
     const handleNewMessage = (message: MessageResponse) => {
       if (message.thread_module_id === threadModuleId) {
         setMessages((prev) => {
-          if (prev.some((m) => m.id === message.id)) {
+          const messageId = String(message.id);
+          if (prev.some((m) => m.id === messageId)) {
             return prev;
           }
 
@@ -358,6 +359,7 @@ export function useChat(
             ...prev,
             {
               ...message,
+              id: messageId,
               sender_type: resolvedSenderType,
               sender_name: senderName,
               farmer_id: normalizedFarmerId,
