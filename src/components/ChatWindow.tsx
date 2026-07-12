@@ -26,7 +26,6 @@ export function ChatWindow({
   isLoadingMore,
   onLoadMore,
 }: ChatWindowProps) {
-  console.log("messages: ", messages);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasInitiallyLoaded = useRef(false);
 

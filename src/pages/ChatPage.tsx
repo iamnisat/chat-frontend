@@ -1,27 +1,37 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { SocketProvider } from "../context/SocketContext";
-import { ThreadList } from "../components/ThreadList";
+import { createAdvisory, fetchConversations } from "../api";
 import { ChatWindow } from "../components/ChatWindow";
-import { MessageInput } from "../components/MessageInput";
 import { ConnectionStatus } from "../components/ConnectionStatus";
+import { MessageInput } from "../components/MessageInput";
+import { ThreadList } from "../components/ThreadList";
+import { SocketProvider, useSocketContext } from "../context/SocketContext";
 import { useChat } from "../hooks/useChat";
-import { useSocketContext } from "../context/SocketContext";
-import { fetchConversations, createAdvisory } from "../api";
 import type { ThreadModule, UserPayload } from "../types";
 
 const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "";
-const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23a78bfa'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='16' font-weight='bold' font-family='system-ui'%3EU%3C/text%3E%3C/svg%3E";
+const PLACEHOLDER_IMG =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23a78bfa'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='16' font-weight='bold' font-family='system-ui'%3EU%3C/text%3E%3C/svg%3E";
 
 function ChatContent() {
   const navigate = useNavigate();
   const [selectedThread, setSelectedThread] = useState<number | null>(null);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [threads, setThreads] = useState<ThreadModule[]>([]);
   const [isCreatingThread, setIsCreatingThread] = useState(false);
   const { joinThread, leaveThread, socket, deleteThread } = useSocketContext();
   const [userData, setUserData] = useState<UserPayload | null>(null);
-  const chat = useChat(selectedThread, userData?.login_type === "farmer" ? userData?.farmer_id : userData?.user_id != null ? String(userData.user_id) : undefined, userData?.login_type, userData?.token);
+  const chat = useChat(
+    selectedThread,
+    userData?.login_type === "farmer"
+      ? userData?.farmer_id
+      : userData?.user_id != null
+      ? String(userData.user_id)
+      : undefined,
+    userData?.login_type,
+    userData?.token
+  );
 
   useEffect(() => {
     const stored = localStorage.getItem("chatUser");
@@ -46,13 +56,21 @@ function ChatContent() {
 
     fetchConversations(userData.token).then((json) => {
       if (json.success && json.data) {
-        const mapped: ThreadModule[] = json.data.map((c: { id: number; conv_name: string; last_message?: string; last_date_time?: number; is_seen?: boolean }) => ({
-          id: c.id,
-          name: c.conv_name,
-          last_message: c.last_message,
-          last_date_time: c.last_date_time,
-          is_seen: c.is_seen,
-        }));
+        const mapped: ThreadModule[] = json.data.map(
+          (c: {
+            id: number;
+            conv_name: string;
+            last_message?: string;
+            last_date_time?: number;
+            is_seen?: boolean;
+          }) => ({
+            id: c.id,
+            name: c.conv_name,
+            last_message: c.last_message,
+            last_date_time: c.last_date_time,
+            is_seen: c.is_seen,
+          })
+        );
         setThreads(mapped);
       }
     });
@@ -107,13 +125,21 @@ function ChatContent() {
     if (!userData?.token) return;
     const json = await fetchConversations(userData.token);
     if (json.success && json.data) {
-      const mapped: ThreadModule[] = json.data.map((c: { id: number; conv_name: string; last_message?: string; last_date_time?: number; is_seen?: boolean }) => ({
-        id: c.id,
-        name: c.conv_name,
-        last_message: c.last_message,
-        last_date_time: c.last_date_time,
-        is_seen: c.is_seen,
-      }));
+      const mapped: ThreadModule[] = json.data.map(
+        (c: {
+          id: number;
+          conv_name: string;
+          last_message?: string;
+          last_date_time?: number;
+          is_seen?: boolean;
+        }) => ({
+          id: c.id,
+          name: c.conv_name,
+          last_message: c.last_message,
+          last_date_time: c.last_date_time,
+          is_seen: c.is_seen,
+        })
+      );
       setThreads(mapped);
     }
   }, [userData?.token]);
@@ -122,7 +148,10 @@ function ChatContent() {
     if (!userData?.token || !userData?.farmer_id || isCreatingThread) return;
     setIsCreatingThread(true);
     try {
-      const json = await createAdvisory(userData.token, Number(userData.farmer_id));
+      const json = await createAdvisory(
+        userData.token,
+        Number(userData.farmer_id)
+      );
       if (json.success && json.data?.id) {
         await refreshThreads();
         setSelectedThread(json.data.id);
@@ -156,7 +185,11 @@ function ChatContent() {
 
   const handleTypingStart = useCallback(() => {
     if (!userData) return;
-    chat.emitTypingStart(userData.name || "Farmer", userData.user_id, userData.farmer_id);
+    chat.emitTypingStart(
+      userData.name || "Farmer",
+      userData.user_id,
+      userData.farmer_id
+    );
   }, [chat, userData]);
 
   const handleTypingStop = useCallback(() => {
@@ -166,7 +199,8 @@ function ChatContent() {
 
   if (!userData) return null;
 
-  const selectedThreadName = threads.find((t) => t.id === selectedThread)?.name || "";
+  const selectedThreadName =
+    threads.find((t) => t.id === selectedThread)?.name || "";
 
   return (
     <div className="h-dvh flex flex-col bg-gray-50">
@@ -179,8 +213,18 @@ function ChatContent() {
               onClick={() => setSidebarOpen(true)}
               className="md:hidden p-2 rounded-xl hover:bg-purple-50 transition-colors text-gray-500 flex-shrink-0"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                />
               </svg>
             </button>
             <div className="relative flex-shrink-0">
@@ -189,11 +233,15 @@ function ChatContent() {
                   src={`${IMAGE_BASE_URL}/${userData.base_image}`}
                   alt={userData.name || "User"}
                   className="w-10 h-10 rounded-xl object-cover shadow-md"
-                  onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }}
+                  onError={(e) => {
+                    e.currentTarget.src = PLACEHOLDER_IMG;
+                  }}
                 />
               ) : (
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white shadow-md"
-                     style={{ background: "var(--own-gradient)" }}>
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white shadow-md"
+                  style={{ background: "var(--own-gradient)" }}
+                >
                   {userData.name?.charAt(0).toUpperCase() || "U"}
                 </div>
               )}
@@ -214,8 +262,18 @@ function ChatContent() {
               className="p-2 rounded-xl hover:bg-rose-50 transition-colors text-gray-400 hover:text-rose-500"
               title="Logout"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"
+                />
               </svg>
             </button>
           </div>
@@ -224,10 +282,22 @@ function ChatContent() {
         {/* Thread name bar (when thread selected) */}
         {selectedThread && (
           <div className="px-4 py-2 bg-purple-50/50 border-t border-purple-100/50 flex items-center gap-2">
-            <svg className="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+            <svg
+              className="w-4 h-4 text-purple-500 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"
+              />
             </svg>
-            <span className="text-xs font-semibold text-purple-700 truncate">{selectedThreadName}</span>
+            <span className="text-xs font-semibold text-purple-700 truncate">
+              {selectedThreadName}
+            </span>
           </div>
         )}
       </header>
@@ -239,15 +309,28 @@ function ChatContent() {
       />
 
       {/* Mobile sidebar */}
-      <div className={`thread-sidebar md:hidden ${sidebarOpen ? "open" : ""}`} style={{ background: "var(--surface)" }}>
+      <div
+        className={`thread-sidebar md:hidden ${sidebarOpen ? "open" : ""}`}
+        style={{ background: "var(--surface)" }}
+      >
         <div className="flex items-center justify-between p-4 border-b border-purple-100">
           <span className="font-bold text-gray-800">Threads</span>
           <button
             onClick={() => setSidebarOpen(false)}
             className="p-1.5 rounded-lg hover:bg-purple-50 transition-colors text-gray-500"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -282,7 +365,11 @@ function ChatContent() {
               <div className="flex-1 min-h-0 overflow-hidden">
                 <ChatWindow
                   messages={chat.messages}
-                  currentUserId={userData.login_type === "farmer" ? (userData.farmer_id ?? "") : String(userData.user_id ?? "")}
+                  currentUserId={
+                    userData.login_type === "farmer"
+                      ? userData.farmer_id ?? ""
+                      : String(userData.user_id ?? "")
+                  }
                   currentUserType={userData.login_type ?? "user"}
                   isTyping={chat.isTyping}
                   typingUser={chat.typingUser}
@@ -299,15 +386,35 @@ function ChatContent() {
               />
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center" style={{ background: "var(--surface)" }}>
+            <div
+              className="flex-1 flex items-center justify-center"
+              style={{ background: "var(--surface)" }}
+            >
               <div className="text-center animate-float">
-                <div className="w-24 h-24 mx-auto mb-5 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-100" style={{ background: "var(--own-gradient)" }}>
-                  <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 20.105V4.875A1.875 1.875 0 0 1 5.625 3h12.75A1.875 1.875 0 0 1 20.25 4.875v10.5A1.875 1.875 0 0 1 18.375 17.25H7.5l-3.75 2.855Z" />
+                <div
+                  className="w-24 h-24 mx-auto mb-5 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-100"
+                  style={{ background: "var(--own-gradient)" }}
+                >
+                  <svg
+                    className="w-12 h-12 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 20.105V4.875A1.875 1.875 0 0 1 5.625 3h12.75A1.875 1.875 0 0 1 20.25 4.875v10.5A1.875 1.875 0 0 1 18.375 17.25H7.5l-3.75 2.855Z"
+                    />
                   </svg>
                 </div>
-                <h2 className="text-xl font-bold text-gray-700 mb-2">Welcome to Chat</h2>
-                <p className="text-sm text-gray-400 max-w-xs mx-auto">Select a conversation from the sidebar to start chatting</p>
+                <h2 className="text-xl font-bold text-gray-700 mb-2">
+                  Welcome to Chat
+                </h2>
+                <p className="text-sm text-gray-400 max-w-xs mx-auto">
+                  Select a conversation from the sidebar to start chatting
+                </p>
               </div>
             </div>
           )}

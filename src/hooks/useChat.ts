@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useSocketContext } from "../context/SocketContext";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchMessages } from "../api";
-import type { MessageResponse, SendMessagePayload, LoginType } from "../types";
+import { useSocketContext } from "../context/SocketContext";
+import type { LoginType, MessageResponse, SendMessagePayload } from "../types";
 
 function normalizeHistoricalMessage(
   raw: Record<string, unknown>,
@@ -30,9 +30,7 @@ function normalizeHistoricalMessage(
     raw.farmerId ??
     (senderType === "farmer" ? senderId : null);
   const rawUserId =
-    raw.user_id ??
-    raw.userId ??
-    (senderType === "user" ? senderId : null);
+    raw.user_id ?? raw.userId ?? (senderType === "user" ? senderId : null);
 
   const farmerId = rawFarmerId != null ? String(rawFarmerId) : null;
   const userId = rawUserId != null ? Number(rawUserId) : null;
@@ -58,7 +56,11 @@ function normalizeHistoricalMessage(
     resolvedSenderType = senderType as "farmer" | "user";
   } else if (currentUserType === "farmer" && farmerId === currentUserId) {
     resolvedSenderType = "farmer";
-  } else if (currentUserType === "user" && userId != null && String(userId) === currentUserId) {
+  } else if (
+    currentUserType === "user" &&
+    userId != null &&
+    String(userId) === currentUserId
+  ) {
     resolvedSenderType = "user";
   } else {
     resolvedSenderType = "ai_agent";
@@ -67,45 +69,54 @@ function normalizeHistoricalMessage(
   const isOwn =
     !isAiMessage &&
     ((currentUserType === "farmer" && farmerId === currentUserId) ||
-      (currentUserType === "user" && userId != null && String(userId) === currentUserId));
+      (currentUserType === "user" &&
+        userId != null &&
+        String(userId) === currentUserId));
 
-  const normalizedFarmerId = isOwn && currentUserType === "farmer" ? currentUserId : farmerId;
-  const normalizedUserId = isOwn && currentUserType === "user" ? (currentUserId != null ? Number(currentUserId) : null) : userId;
+  const normalizedFarmerId =
+    isOwn && currentUserType === "farmer" ? currentUserId : farmerId;
+  const normalizedUserId =
+    isOwn && currentUserType === "user"
+      ? currentUserId != null
+        ? Number(currentUserId)
+        : null
+      : userId;
 
   const resolvedSenderName =
     senderName ||
     (resolvedSenderType === "ai_agent"
       ? "Aunkur AI"
       : resolvedSenderType === "farmer"
-      ? (normalizedFarmerId?.split("_")[0] ?? "Farmer")
+      ? normalizedFarmerId?.split("_")[0] ?? "Farmer"
       : `User ${normalizedUserId ?? "unknown"}`);
 
   const message: MessageResponse = {
-    id: (raw.id as string) ?? `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id:
+      (raw.id as string) ??
+      `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     thread_module_id: (raw.thread_module_id as number) ?? 0,
-    message: ((raw.message as string) ?? (raw.text as string) ?? (raw.content as string) ?? "") as string,
+    message: ((raw.message as string) ??
+      (raw.text as string) ??
+      (raw.content as string) ??
+      "") as string,
     user_id: normalizedUserId,
     farmer_id: normalizedFarmerId,
     sender_type: resolvedSenderType,
     sender_name: resolvedSenderName,
-    created_at: ((raw.created_at as string) ?? (raw.createdAt as string) ?? new Date().toISOString()) as string,
+    created_at: ((raw.created_at as string) ??
+      (raw.createdAt as string) ??
+      new Date().toISOString()) as string,
   };
-
-  console.log(
-    "[History] Normalized message =>",
-    `id: ${message.id}`,
-    `senderType: ${message.sender_type}`,
-    `farmerId: ${message.farmer_id}`,
-    `userId: ${message.user_id}`,
-    `senderName: ${message.sender_name}`,
-    `isOwn: ${isOwn}`,
-    `text: ${message.message.substring(0, 50)}`
-  );
 
   return message;
 }
 
-export function useChat(threadModuleId: number | null, currentUserId?: string, currentUserType?: LoginType, token?: string) {
+export function useChat(
+  threadModuleId: number | null,
+  currentUserId?: string,
+  currentUserType?: LoginType,
+  token?: string
+) {
   const { socket, isConnected } = useSocketContext();
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -121,7 +132,8 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
   }, []);
 
   const loadMore = useCallback(() => {
-    if (!token || !threadModuleId || isLoadingMoreRef.current || !hasMorePages) return;
+    if (!token || !threadModuleId || isLoadingMoreRef.current || !hasMorePages)
+      return;
 
     isLoadingMoreRef.current = true;
     setIsLoadingMore(true);
@@ -132,25 +144,40 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
 
     fetchMessages(token, threadModuleId, nextPage).then((json) => {
       if (json.success && json.data) {
-        const normalized: MessageResponse[] = json.data.map((msg: Record<string, unknown>) => {
-          const senderType = msg.user ? "ai_agent" : "farmer";
-          const senderUser = msg.user as { id: number; name: string; images?: string } | null;
-          const senderFarmer = msg.farmer as { id: number; name: string; base_image?: string } | null;
+        const normalized: MessageResponse[] = json.data.map(
+          (msg: Record<string, unknown>) => {
+            const senderType = msg.user ? "ai_agent" : "farmer";
+            const senderUser = msg.user as {
+              id: number;
+              name: string;
+              images?: string;
+            } | null;
+            const senderFarmer = msg.farmer as {
+              id: number;
+              name: string;
+              base_image?: string;
+            } | null;
 
-          return {
-            id: String(msg.id ?? `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
-            thread_module_id: threadModuleId,
-            message: (msg.message as string) ?? "",
-            user_id: senderUser?.id ?? null,
-            farmer_id: senderFarmer ? String(senderFarmer.id) : null,
-            sender_type: senderType as "ai_agent" | "farmer",
-            sender_name: senderUser?.name ?? senderFarmer?.name ?? "Unknown",
-            created_at: msg.createdAt ? new Date(msg.createdAt as number).toISOString() : new Date().toISOString(),
-            images: (msg.images as string[]) ?? [],
-            user: senderUser,
-            farmer: senderFarmer,
-          };
-        });
+            return {
+              id: String(
+                msg.id ??
+                  `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+              ),
+              thread_module_id: threadModuleId,
+              message: (msg.message as string) ?? "",
+              user_id: senderUser?.id ?? null,
+              farmer_id: senderFarmer ? String(senderFarmer.id) : null,
+              sender_type: senderType as "ai_agent" | "farmer",
+              sender_name: senderUser?.name ?? senderFarmer?.name ?? "Unknown",
+              created_at: msg.createdAt
+                ? new Date(msg.createdAt as number).toISOString()
+                : new Date().toISOString(),
+              images: (msg.images as string[]) ?? [],
+              user: senderUser,
+              farmer: senderFarmer,
+            };
+          }
+        );
 
         pageRef.current = nextPage;
         setHasMorePages(json.paginatorInfo?.hasMorePages ?? false);
@@ -179,25 +206,43 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
     if (token) {
       fetchMessages(token, threadModuleId).then((json) => {
         if (json.success && json.data) {
-          const normalized: MessageResponse[] = json.data.map((msg: Record<string, unknown>) => {
-            const senderType = msg.user ? "ai_agent" : "farmer";
-            const senderUser = msg.user as { id: number; name: string; images?: string } | null;
-            const senderFarmer = msg.farmer as { id: number; name: string; base_image?: string } | null;
+          const normalized: MessageResponse[] = json.data.map(
+            (msg: Record<string, unknown>) => {
+              const senderType = msg.user ? "ai_agent" : "farmer";
+              const senderUser = msg.user as {
+                id: number;
+                name: string;
+                images?: string;
+              } | null;
+              const senderFarmer = msg.farmer as {
+                id: number;
+                name: string;
+                base_image?: string;
+              } | null;
 
-            return {
-              id: String(msg.id ?? `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
-              thread_module_id: threadModuleId,
-              message: (msg.message as string) ?? "",
-              user_id: senderUser?.id ?? null,
-              farmer_id: senderFarmer ? String(senderFarmer.id) : null,
-              sender_type: senderType as "ai_agent" | "farmer",
-              sender_name: senderUser?.name ?? senderFarmer?.name ?? "Unknown",
-              created_at: msg.createdAt ? new Date(msg.createdAt as number).toISOString() : new Date().toISOString(),
-              images: (msg.images as string[]) ?? [],
-              user: senderUser,
-              farmer: senderFarmer,
-            };
-          });
+              return {
+                id: String(
+                  msg.id ??
+                    `hist_${Date.now()}_${Math.random()
+                      .toString(36)
+                      .slice(2, 8)}`
+                ),
+                thread_module_id: threadModuleId,
+                message: (msg.message as string) ?? "",
+                user_id: senderUser?.id ?? null,
+                farmer_id: senderFarmer ? String(senderFarmer.id) : null,
+                sender_type: senderType as "ai_agent" | "farmer",
+                sender_name:
+                  senderUser?.name ?? senderFarmer?.name ?? "Unknown",
+                created_at: msg.createdAt
+                  ? new Date(msg.createdAt as number).toISOString()
+                  : new Date().toISOString(),
+                images: (msg.images as string[]) ?? [],
+                user: senderUser,
+                farmer: senderFarmer,
+              };
+            }
+          );
           pageRef.current = 1;
           setHasMorePages(json.paginatorInfo?.hasMorePages ?? false);
           setMessages(normalized);
@@ -205,17 +250,30 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
         }
       });
     } else if (socket) {
-      socket.emit("message:history", { thread_module_id: threadModuleId }, (response: { success: boolean; data?: MessageResponse[]; message?: string }) => {
-        if (response.success && response.data) {
-          const normalized = currentUserId != null && currentUserType != null
-            ? response.data.map((msg) =>
-                normalizeHistoricalMessage(msg as unknown as Record<string, unknown>, currentUserId, currentUserType)
-              )
-            : response.data;
-          setMessages(normalized);
-          setTimeout(scrollToBottom, 50);
+      socket.emit(
+        "message:history",
+        { thread_module_id: threadModuleId },
+        (response: {
+          success: boolean;
+          data?: MessageResponse[];
+          message?: string;
+        }) => {
+          if (response.success && response.data) {
+            const normalized =
+              currentUserId != null && currentUserType != null
+                ? response.data.map((msg) =>
+                    normalizeHistoricalMessage(
+                      msg as unknown as Record<string, unknown>,
+                      currentUserId,
+                      currentUserType
+                    )
+                  )
+                : response.data;
+            setMessages(normalized);
+            setTimeout(scrollToBottom, 50);
+          }
         }
-      });
+      );
     }
 
     if (!socket) return () => {};
@@ -255,18 +313,32 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
           const rawFarmerId =
             raw.farmer_id ??
             raw.farmerId ??
-            (resolvedSenderType === "farmer" ? (raw.sender_id ?? raw.senderId) : null);
+            (resolvedSenderType === "farmer"
+              ? raw.sender_id ?? raw.senderId
+              : null);
           const rawUserId =
             raw.user_id ??
             raw.userId ??
-            (resolvedSenderType === "user" ? (raw.sender_id ?? raw.senderId) : null);
+            (resolvedSenderType === "user"
+              ? raw.sender_id ?? raw.senderId
+              : null);
 
-          const normalizedFarmerId = resolvedSenderType === "farmer" && currentUserType === "farmer" && currentUserId
-            ? currentUserId
-            : rawFarmerId != null ? String(rawFarmerId) : null;
-          const normalizedUserId = resolvedSenderType === "user" && currentUserType === "user" && currentUserId
-            ? Number(currentUserId)
-            : rawUserId != null ? Number(rawUserId) : null;
+          const normalizedFarmerId =
+            resolvedSenderType === "farmer" &&
+            currentUserType === "farmer" &&
+            currentUserId
+              ? currentUserId
+              : rawFarmerId != null
+              ? String(rawFarmerId)
+              : null;
+          const normalizedUserId =
+            resolvedSenderType === "user" &&
+            currentUserType === "user" &&
+            currentUserId
+              ? Number(currentUserId)
+              : rawUserId != null
+              ? Number(rawUserId)
+              : null;
 
           const senderName =
             (raw.sender_name as string) ??
@@ -275,26 +347,37 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
             (resolvedSenderType === "ai_agent" ? "Aunkur AI" : "Farmer");
 
           const rawCreatedAt = raw.created_at ?? raw.createdAt;
-          const createdAt = typeof rawCreatedAt === "number"
-            ? new Date(rawCreatedAt).toISOString()
-            : typeof rawCreatedAt === "string"
-            ? rawCreatedAt
-            : new Date().toISOString();
+          const createdAt =
+            typeof rawCreatedAt === "number"
+              ? new Date(rawCreatedAt).toISOString()
+              : typeof rawCreatedAt === "string"
+              ? rawCreatedAt
+              : new Date().toISOString();
 
-          return [...prev, {
-            ...message,
-            sender_type: resolvedSenderType,
-            sender_name: senderName,
-            farmer_id: normalizedFarmerId,
-            user_id: normalizedUserId,
-            created_at: createdAt,
-          }];
+          return [
+            ...prev,
+            {
+              ...message,
+              sender_type: resolvedSenderType,
+              sender_name: senderName,
+              farmer_id: normalizedFarmerId,
+              user_id: normalizedUserId,
+              created_at: createdAt,
+            },
+          ];
         });
       }
     };
 
-    const handleTypingStart = (data: { thread_module_id: number; sender_type?: string; sender_name?: string }) => {
-      if (data.thread_module_id === threadModuleId && data.sender_type === "ai_agent") {
+    const handleTypingStart = (data: {
+      thread_module_id: number;
+      sender_type?: string;
+      sender_name?: string;
+    }) => {
+      if (
+        data.thread_module_id === threadModuleId &&
+        data.sender_type === "ai_agent"
+      ) {
         setIsTyping(true);
         setTypingUser(data.sender_name || "AI");
       }
@@ -313,15 +396,24 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
       }
     };
 
-    const handleMessageUpdated = (data: { thread_module_id: number; message_id: string; message: string }) => {
+    const handleMessageUpdated = (data: {
+      thread_module_id: number;
+      message_id: string;
+      message: string;
+    }) => {
       if (data.thread_module_id === threadModuleId) {
         setMessages((prev) =>
-          prev.map((msg) => (msg.id === data.message_id ? { ...msg, message: data.message } : msg))
+          prev.map((msg) =>
+            msg.id === data.message_id ? { ...msg, message: data.message } : msg
+          )
         );
       }
     };
 
-    const handleMessageDeleted = (data: { thread_module_id: number; message_id: string }) => {
+    const handleMessageDeleted = (data: {
+      thread_module_id: number;
+      message_id: string;
+    }) => {
       if (data.thread_module_id === threadModuleId) {
         setMessages((prev) => prev.filter((msg) => msg.id !== data.message_id));
       }
@@ -345,19 +437,30 @@ export function useChat(threadModuleId: number | null, currentUserId?: string, c
   }, [socket, threadModuleId, currentUserId, currentUserType, token]);
 
   const sendMessage = useCallback(
-    (payload: Omit<SendMessagePayload, "thread_module_id"> & { thread_module_id?: number }) => {
+    (
+      payload: Omit<SendMessagePayload, "thread_module_id"> & {
+        thread_module_id?: number;
+      }
+    ) => {
       if (!socket || !isConnected || !threadModuleId) return;
 
       const fullPayload: SendMessagePayload = {
         ...payload,
         thread_module_id: payload.thread_module_id ?? threadModuleId,
       };
-
-      socket.emit("message:send", fullPayload, (response: { success: boolean; message?: string; data?: MessageResponse }) => {
-        if (!response.success) {
-          console.error("Failed to send message:", response.message);
+      socket.emit(
+        "message:send",
+        fullPayload,
+        (response: {
+          success: boolean;
+          message?: string;
+          data?: MessageResponse;
+        }) => {
+          if (!response.success) {
+            console.error("Failed to send message:", response.message);
+          }
         }
-      });
+      );
     },
     [socket, isConnected, threadModuleId]
   );
