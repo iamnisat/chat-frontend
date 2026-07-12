@@ -124,7 +124,7 @@ export function ChatWindow({
             </div>
           )}
           {messages
-            .sort((a, b) => a.id - b.id)
+            .sort((a, b) => a.id.localeCompare(b.id))
             .map((msg) => (
               <MessageBubble
                 key={msg.id}
