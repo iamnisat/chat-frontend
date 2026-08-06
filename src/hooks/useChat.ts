@@ -144,7 +144,7 @@ export function useChat(
 
     fetchMessages(token, threadModuleId, nextPage).then((json) => {
       if (json.success && json.data) {
-        const normalized: MessageResponse[] = json.data.map(
+        const normalized: MessageResponse[] = json.data?.messages?.map(
           (msg: Record<string, unknown>) => {
             const senderType = msg.user ? "ai_agent" : "farmer";
             const senderUser = msg.user as {
@@ -206,7 +206,7 @@ export function useChat(
     if (token) {
       fetchMessages(token, threadModuleId).then((json) => {
         if (json.success && json.data) {
-          const normalized: MessageResponse[] = json.data.map(
+          const normalized: MessageResponse[] = json.data?.messages?.map(
             (msg: Record<string, unknown>) => {
               const senderType = msg.user ? "ai_agent" : "farmer";
               const senderUser = msg.user as {
