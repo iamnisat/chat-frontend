@@ -376,6 +376,7 @@ function ChatContent() {
                   messagesEndRef={chat.messagesEndRef}
                   hasMorePages={chat.hasMorePages}
                   isLoadingMore={chat.isLoadingMore}
+                  isLoadingInitial={chat.isLoadingInitial}
                   onLoadMore={chat.loadMore}
                 />
               </div>

@@ -123,9 +123,13 @@ export function useChat(
   const [typingUser, setTypingUser] = useState<string>("");
   const [hasMorePages, setHasMorePages] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isLoadingInitial, setIsLoadingInitial] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef(1);
   const isLoadingMoreRef = useRef(false);
+  const typingSafetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -198,13 +202,17 @@ export function useChat(
   useEffect(() => {
     if (!threadModuleId) {
       setMessages([]);
+      setIsLoadingInitial(false);
       return;
     }
 
+    let ignore = false;
     setMessages([]);
+    setIsLoadingInitial(true);
 
     if (token) {
       fetchMessages(token, threadModuleId).then((json) => {
+        if (ignore) return;
         if (json.success && json.data) {
           const normalized: MessageResponse[] = json.data?.messages?.map(
             (msg: Record<string, unknown>) => {
@@ -248,6 +256,7 @@ export function useChat(
           setMessages(normalized);
           setTimeout(scrollToBottom, 50);
         }
+        setIsLoadingInitial(false);
       });
     } else if (socket) {
       socket.emit(
@@ -258,6 +267,7 @@ export function useChat(
           data?: MessageResponse[];
           message?: string;
         }) => {
+          if (ignore) return;
           if (response.success && response.data) {
             const normalized =
               currentUserId != null && currentUserType != null
@@ -272,11 +282,17 @@ export function useChat(
             setMessages(normalized);
             setTimeout(scrollToBottom, 50);
           }
+          setIsLoadingInitial(false);
         }
       );
+    } else {
+      setIsLoadingInitial(false);
     }
 
-    if (!socket) return () => {};
+    if (!socket)
+      return () => {
+        ignore = true;
+      };
 
     const handleNewMessage = (message: MessageResponse) => {
       if (message.thread_module_id === threadModuleId) {
@@ -368,6 +384,30 @@ export function useChat(
             },
           ];
         });
+
+        // Keep the typing bubble visible right up until the actual reply
+        // arrives, instead of hiding it on "typing:stop" (which can fire a
+        // moment before the message itself is delivered).
+        const raw = message as unknown as Record<string, unknown>;
+        const senderType = (
+          (raw.sender_type as string) ??
+          (raw.senderType as string) ??
+          (raw.role as string) ??
+          ""
+        ).toLowerCase();
+        if (
+          senderType === "ai_agent" ||
+          senderType === "ai" ||
+          senderType === "assistant" ||
+          senderType === "agent"
+        ) {
+          if (typingSafetyTimeoutRef.current) {
+            clearTimeout(typingSafetyTimeoutRef.current);
+            typingSafetyTimeoutRef.current = null;
+          }
+          setIsTyping(false);
+          setTypingUser("");
+        }
       }
     };
 
@@ -380,16 +420,30 @@ export function useChat(
         data.thread_module_id === threadModuleId &&
         data.sender_type === "ai_agent"
       ) {
+        if (typingSafetyTimeoutRef.current) {
+          clearTimeout(typingSafetyTimeoutRef.current);
+          typingSafetyTimeoutRef.current = null;
+        }
         setIsTyping(true);
         setTypingUser(data.sender_name || "AI");
       }
     };
 
     const handleTypingStop = (data: { thread_module_id: number }) => {
-      if (data.thread_module_id === threadModuleId) {
+      if (data.thread_module_id !== threadModuleId) return;
+
+      // Don't hide the bubble immediately — "typing:stop" can arrive a
+      // moment before the actual reply. Keep it up and let the reply
+      // message (in handleNewMessage) clear it. As a safety net, force
+      // it off if no reply shows up shortly after.
+      if (typingSafetyTimeoutRef.current) {
+        clearTimeout(typingSafetyTimeoutRef.current);
+      }
+      typingSafetyTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
         setTypingUser("");
-      }
+        typingSafetyTimeoutRef.current = null;
+      }, 15000);
     };
 
     const handleMessageSeen = (data: { thread_module_id: number }) => {
@@ -435,6 +489,11 @@ export function useChat(
       socket.off("message:seen", handleMessageSeen);
       socket.off("message:updated", handleMessageUpdated);
       socket.off("message:deleted", handleMessageDeleted);
+      if (typingSafetyTimeoutRef.current) {
+        clearTimeout(typingSafetyTimeoutRef.current);
+        typingSafetyTimeoutRef.current = null;
+      }
+      ignore = true;
     };
   }, [socket, threadModuleId, currentUserId, currentUserType, token]);
 
@@ -503,6 +562,7 @@ export function useChat(
     typingUser,
     hasMorePages,
     isLoadingMore,
+    isLoadingInitial,
     sendMessage,
     markSeen,
     emitTypingStart,
