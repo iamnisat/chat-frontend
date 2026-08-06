@@ -28,6 +28,7 @@ export function ChatWindow({
 }: ChatWindowProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasInitiallyLoaded = useRef(false);
+  const lastMessageIdRef = useRef<string | number | null>(null);
 
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -41,15 +42,40 @@ export function ChatWindow({
   useEffect(() => {
     if (messages.length === 0) {
       hasInitiallyLoaded.current = false;
+      lastMessageIdRef.current = null;
       return;
     }
+
+    const newestMessage = messages.reduce((latest, msg) =>
+      msg.created_at.localeCompare(latest.created_at) > 0 ? msg : latest
+    );
+
     if (!hasInitiallyLoaded.current) {
       hasInitiallyLoaded.current = true;
+      lastMessageIdRef.current = newestMessage.id;
       requestAnimationFrame(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
       });
+      return;
+    }
+
+    // Scroll to the newest message whenever it changes (new message sent or
+    // received), so the latest message always sits just above the input.
+    if (newestMessage.id !== lastMessageIdRef.current) {
+      lastMessageIdRef.current = newestMessage.id;
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      });
     }
   }, [messages, messagesEndRef]);
+
+  useEffect(() => {
+    if (!isTyping || !hasInitiallyLoaded.current) return;
+    // Keep the typing bubble in view as it appears below the last message.
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    });
+  }, [isTyping, messagesEndRef]);
 
   return (
     <div
