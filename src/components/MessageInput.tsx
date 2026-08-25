@@ -5,11 +5,18 @@ interface MessageInputProps {
   onTypingStart: () => void;
   onTypingStop: () => void;
   disabled?: boolean;
+  isSending?: boolean;
 }
 
 const MAX_CHARS = 5000;
 
-export function MessageInput({ onSendMessage, onTypingStart, onTypingStop, disabled }: MessageInputProps) {
+export function MessageInput({
+  onSendMessage,
+  onTypingStart,
+  onTypingStop,
+  disabled,
+  isSending = false,
+}: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -55,6 +62,8 @@ export function MessageInput({ onSendMessage, onTypingStart, onTypingStop, disab
   };
 
   const handleSend = () => {
+    if (isSending) return;
+
     const trimmed = message.trim();
     if (trimmed && trimmed.length <= MAX_CHARS) {
       onSendMessage(trimmed);
@@ -98,27 +107,58 @@ export function MessageInput({ onSendMessage, onTypingStart, onTypingStop, disab
           />
           <button
             onClick={handleSend}
-            disabled={disabled || !hasText || isOverLimit}
+            disabled={disabled || isSending || !hasText || isOverLimit}
             className={`m-1.5 p-2.5 rounded-xl transition-all duration-200 ${
-              hasText && !isOverLimit
+              hasText && !isOverLimit && !isSending
                 ? "text-white shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
             style={
-              hasText && !isOverLimit
+              hasText && !isOverLimit && !isSending
                 ? { background: "var(--own-gradient)" }
                 : undefined
             }
+            aria-label={isSending ? "Sending message" : "Send message"}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-            </svg>
+            {isSending ? (
+              <svg
+                className="w-5 h-5 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 3v3m0 12v3m9-9h-3M6 12H3m14.95 7.05-2.12-2.12M9.17 9.17 6.05 6.05m11.9 0-2.12 2.12M9.17 14.83l-3.12 3.12"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"
+                />
+              </svg>
+            )}
           </button>
         </div>
         <div className="mt-1.5 flex justify-end px-1">
           <span
             className={`text-[10px] font-medium transition-colors ${
-              isOverLimit ? "text-rose-500" : charCount > MAX_CHARS * 0.9 ? "text-amber-500" : "text-gray-300"
+              isOverLimit
+                ? "text-rose-500"
+                : charCount > MAX_CHARS * 0.9
+                  ? "text-amber-500"
+                  : "text-gray-300"
             }`}
           >
             {charCount > 0 ? `${charCount}/${MAX_CHARS}` : ""}

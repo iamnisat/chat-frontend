@@ -6,7 +6,7 @@ import { ConnectionStatus } from "../components/ConnectionStatus";
 import { MessageInput } from "../components/MessageInput";
 import { ThreadList } from "../components/ThreadList";
 import { SocketProvider, useSocketContext } from "../context/SocketContext";
-import { useChat } from "../hooks/useChat";
+import { useChat } from "../hooks/useChat.ts";
 import type { ThreadModule, UserPayload } from "../types";
 
 const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "";
@@ -27,10 +27,10 @@ function ChatContent() {
     userData?.login_type === "farmer"
       ? userData?.farmer_id
       : userData?.user_id != null
-      ? String(userData.user_id)
-      : undefined,
+        ? String(userData.user_id)
+        : undefined,
     userData?.login_type,
-    userData?.token
+    userData?.token,
   );
 
   useEffect(() => {
@@ -69,7 +69,7 @@ function ChatContent() {
             last_message: c.last_message,
             last_date_time: c.last_date_time,
             is_seen: c.is_seen,
-          })
+          }),
         );
         setThreads(mapped);
       }
@@ -118,7 +118,7 @@ function ChatContent() {
       joinThread(threadId);
       setSidebarOpen(false);
     },
-    [selectedThread, joinThread, leaveThread]
+    [selectedThread, joinThread, leaveThread],
   );
 
   const refreshThreads = useCallback(async () => {
@@ -138,7 +138,7 @@ function ChatContent() {
           last_message: c.last_message,
           last_date_time: c.last_date_time,
           is_seen: c.is_seen,
-        })
+        }),
       );
       setThreads(mapped);
     }
@@ -150,7 +150,7 @@ function ChatContent() {
     try {
       const json = await createAdvisory(
         userData.token,
-        Number(userData.farmer_id)
+        Number(userData.farmer_id),
       );
       if (json.success && json.data?.id) {
         await refreshThreads();
@@ -167,7 +167,7 @@ function ChatContent() {
     async (threadId: number) => {
       await deleteThread(threadId);
     },
-    [deleteThread]
+    [deleteThread],
   );
 
   const handleSendMessage = useCallback(
@@ -180,7 +180,7 @@ function ChatContent() {
         sender_type: userData.login_type,
       });
     },
-    [chat, userData]
+    [chat, userData],
   );
 
   const handleTypingStart = useCallback(() => {
@@ -188,7 +188,7 @@ function ChatContent() {
     chat.emitTypingStart(
       userData.name || "Farmer",
       userData.user_id,
-      userData.farmer_id
+      userData.farmer_id,
     );
   }, [chat, userData]);
 
@@ -367,7 +367,7 @@ function ChatContent() {
                   messages={chat.messages}
                   currentUserId={
                     userData.login_type === "farmer"
-                      ? userData.farmer_id ?? ""
+                      ? (userData.farmer_id ?? "")
                       : String(userData.user_id ?? "")
                   }
                   currentUserType={userData.login_type ?? "user"}
@@ -384,6 +384,8 @@ function ChatContent() {
                 onSendMessage={handleSendMessage}
                 onTypingStart={handleTypingStart}
                 onTypingStop={handleTypingStop}
+                disabled={chat.isSending}
+                isSending={chat.isSending}
               />
             </>
           ) : (

@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react";
 import type { MessageResponse } from "../types";
+import { TypingIndicator } from "./TypingIndicator";
 
 const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "";
 
@@ -45,12 +47,56 @@ function getSenderImage(message: MessageResponse): string | null {
   return null;
 }
 
+function hasVisibleContent(messageText: string): boolean {
+  return (
+    String(messageText ?? "")
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .trim().length > 0
+  );
+}
+
 export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
+  if (!hasVisibleContent(message.message)) {
+    return null;
+  }
+
   const isAI = message.sender_type === "ai_agent";
   const senderImage = getSenderImage(message);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const prevMessageRef = useRef<string>(message.message || "");
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    if (message.streaming) {
+      el.textContent = message.message || "";
+    } else {
+      el.innerHTML = message.message || "";
+    }
+    prevMessageRef.current = message.message || "";
+  }, [message.id]);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const prev = prevMessageRef.current || "";
+    const next = message.message || "";
+    if (next === prev) return;
+    if (message.streaming) {
+      const suffix = next.slice(prev.length);
+      if (suffix) {
+        el.appendChild(document.createTextNode(suffix));
+      }
+      el.innerHTML = next;
+    }
+    prevMessageRef.current = next;
+  }, [message.message, message.streaming]);
 
   return (
-    <div className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-3 animate-fade-in-up`}>
+    <div
+      className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-3 animate-fade-in-up`}
+    >
       {!isOwn && (
         <div className="flex-shrink-0 mr-2 mt-1">
           {senderImage ? (
@@ -58,11 +104,21 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
               src={senderImage}
               alt={message.sender_name}
               className="w-8 h-8 rounded-lg object-cover"
-              onError={(e) => { e.currentTarget.src = isAI ? AI_PLACEHOLDER : FARMER_PLACEHOLDER; }}
+              onError={(e) => {
+                e.currentTarget.src = isAI
+                  ? AI_PLACEHOLDER
+                  : FARMER_PLACEHOLDER;
+              }}
             />
           ) : (
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white"
-                 style={{ background: isAI ? "var(--own-gradient)" : "linear-gradient(135deg, #34d399 0%, #10b981 100%)" }}>
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white"
+              style={{
+                background: isAI
+                  ? "var(--own-gradient)"
+                  : "linear-gradient(135deg, #34d399 0%, #10b981 100%)",
+              }}
+            >
               {message.sender_name?.charAt(0).toUpperCase() || "U"}
             </div>
           )}
@@ -73,27 +129,35 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
           isOwn
             ? "text-white rounded-br-md"
             : isAI
-            ? "text-gray-800 rounded-bl-md border border-purple-100"
-            : "text-gray-800 rounded-bl-md border border-green-100"
+              ? "text-gray-800 rounded-bl-md border border-purple-100"
+              : "text-gray-800 rounded-bl-md border border-green-100"
         }`}
         style={{
           background: isOwn
             ? "var(--own-gradient)"
             : isAI
-            ? "var(--ai-gradient)"
-            : "var(--farmer-gradient)",
+              ? "var(--ai-gradient)"
+              : "var(--farmer-gradient)",
         }}
       >
         {!isOwn && (
-          <div className={`text-xs font-semibold mb-1 ${isAI ? "text-purple-600" : "text-emerald-600"}`}>
+          <div
+            className={`text-xs font-semibold mb-1 ${isAI ? "text-purple-600" : "text-emerald-600"}`}
+          >
             {message.sender_name}
           </div>
         )}
+        <div className="text-sm ai-message-content">
+          <div ref={contentRef} />
+          {message.streaming && (
+            <div className="mt-2 text-xs text-gray-400">
+              <TypingIndicator userName={""} />
+            </div>
+          )}
+        </div>
         <div
-          className="text-sm ai-message-content"
-          dangerouslySetInnerHTML={{ __html: message.message }}
-        />
-        <div className={`text-[10px] mt-1.5 ${isOwn ? "text-white/70" : "text-gray-400"}`}>
+          className={`text-[10px] mt-1.5 ${isOwn ? "text-white/70" : "text-gray-400"}`}
+        >
           {formatTime(message.created_at)}
         </div>
       </div>

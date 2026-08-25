@@ -58,4 +58,18 @@ describe("MessageBubble", () => {
 
     expect(screen.getByText("AI Assistant")).toBeInTheDocument();
   });
+
+  it("does not render empty final answers", () => {
+    const emptyMessage: MessageResponse = {
+      ...mockOtherMessage,
+      id: "msg_empty_final_answer",
+      message: "",
+    };
+
+    const { container } = render(
+      <MessageBubble message={emptyMessage} isOwn={false} />,
+    );
+
+    expect(container.firstChild).toBeNull();
+  });
 });

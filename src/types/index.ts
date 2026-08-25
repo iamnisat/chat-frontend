@@ -19,6 +19,9 @@ export interface MessageResponse {
   images?: string[];
   user?: MessageSender | null;
   farmer?: MessageSender | null;
+  // When a message is being delivered in streaming chunks from the server
+  // this flag is true until the stream signals completion.
+  streaming?: boolean;
 }
 
 export interface UserPayload {

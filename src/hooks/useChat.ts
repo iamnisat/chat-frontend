@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchMessages } from "../api";
 import { useSocketContext } from "../context/SocketContext";
 import type { LoginType, MessageResponse, SendMessagePayload } from "../types";
+import type { MessageStreamPayload } from "../context/SocketContext";
 
 function normalizeHistoricalMessage(
   raw: Record<string, unknown>,
   currentUserId: string,
-  currentUserType: LoginType
+  currentUserType: LoginType,
 ): MessageResponse {
   const senderType = (
     (raw.sender_type as string) ??
@@ -87,12 +88,12 @@ function normalizeHistoricalMessage(
     (resolvedSenderType === "ai_agent"
       ? "Aunkur AI"
       : resolvedSenderType === "farmer"
-      ? normalizedFarmerId?.split("_")[0] ?? "Farmer"
-      : `User ${normalizedUserId ?? "unknown"}`);
+        ? (normalizedFarmerId?.split("_")[0] ?? "Farmer")
+        : `User ${normalizedUserId ?? "unknown"}`);
 
   const message: MessageResponse = {
     id: String(
-      raw.id ?? `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      raw.id ?? `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     ),
     thread_module_id: (raw.thread_module_id as number) ?? 0,
     message: ((raw.message as string) ??
@@ -115,20 +116,21 @@ export function useChat(
   threadModuleId: number | null,
   currentUserId?: string,
   currentUserType?: LoginType,
-  token?: string
+  token?: string,
 ) {
-  const { socket, isConnected } = useSocketContext();
+  const { socket, isConnected, subscribeMessageStream } = useSocketContext();
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState<string>("");
   const [hasMorePages, setHasMorePages] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef(1);
   const isLoadingMoreRef = useRef(false);
   const typingSafetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+    null,
   );
 
   const scrollToBottom = useCallback(() => {
@@ -165,7 +167,7 @@ export function useChat(
             return {
               id: String(
                 msg.id ??
-                  `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+                  `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
               ),
               thread_module_id: threadModuleId,
               message: (msg.message as string) ?? "",
@@ -180,7 +182,7 @@ export function useChat(
               user: senderUser,
               farmer: senderFarmer,
             };
-          }
+          },
         );
 
         pageRef.current = nextPage;
@@ -233,7 +235,7 @@ export function useChat(
                   msg.id ??
                     `hist_${Date.now()}_${Math.random()
                       .toString(36)
-                      .slice(2, 8)}`
+                      .slice(2, 8)}`,
                 ),
                 thread_module_id: threadModuleId,
                 message: (msg.message as string) ?? "",
@@ -249,7 +251,7 @@ export function useChat(
                 user: senderUser,
                 farmer: senderFarmer,
               };
-            }
+            },
           );
           pageRef.current = 1;
           setHasMorePages(json.paginatorInfo?.hasMorePages ?? false);
@@ -275,15 +277,15 @@ export function useChat(
                     normalizeHistoricalMessage(
                       msg as unknown as Record<string, unknown>,
                       currentUserId,
-                      currentUserType
-                    )
+                      currentUserType,
+                    ),
                   )
                 : response.data;
             setMessages(normalized);
             setTimeout(scrollToBottom, 50);
           }
           setIsLoadingInitial(false);
-        }
+        },
       );
     } else {
       setIsLoadingInitial(false);
@@ -294,8 +296,178 @@ export function useChat(
         ignore = true;
       };
 
+    let unsubscribeStream: (() => void) | null = null;
+    if (subscribeMessageStream) {
+      const handleStream = (data: MessageStreamPayload) => {
+        if (data.thread_module_id !== threadModuleId) return;
+
+        const messageId = String(
+          data.stream_data?.message_id ??
+            data.stream_data?.messageId ??
+            data.stream_data?.id ??
+            data.stream_data?.client_id ??
+            `stream_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        );
+
+        setMessages((prev) => {
+          const stream = data.stream_data;
+          const eventType = (stream?.type ?? data.type ?? "") as string;
+          const streamStatus = stream?.status ?? data.status ?? null;
+
+          // Helper to detect 'done' statuses
+          const isDone =
+            streamStatus === "done" ||
+            streamStatus === "complete" ||
+            streamStatus === "finished" ||
+            eventType === "done" ||
+            data.type === "done";
+          let incoming =
+            (stream?.content as string) ?? (data.content as string) ?? "";
+          if (eventType === "token" && incoming.startsWith(" ")) {
+            const SHORT_LEADING_SPACE_THRESHOLD = 3;
+            if (incoming.length <= SHORT_LEADING_SPACE_THRESHOLD) {
+              incoming = incoming.trimStart();
+            }
+          }
+          if (eventType === "thinking") {
+            const thinkingId = `${messageId}_thinking`;
+            const idxThinking = prev.findIndex((m) => m.id === thinkingId);
+            const thinkingMsg: MessageResponse = {
+              id: thinkingId,
+              thread_module_id: threadModuleId!,
+              message: incoming,
+              user_id:
+                data.user_id != null ? Number(data.user_id as any) : null,
+              farmer_id: data.farmer_id != null ? String(data.farmer_id) : null,
+              sender_type: (data.sender_type as any) ?? "ai_agent",
+              sender_name: data.sender_name ?? "Aunkur AI",
+              created_at: new Date().toISOString(),
+              streaming: false,
+            };
+
+            if (idxThinking === -1) {
+              // Remove any previous thinking messages (keep only one)
+              const withoutThinking = prev.filter(
+                (m) => !String(m.id).endsWith("_thinking"),
+              );
+              return [...withoutThinking, thinkingMsg];
+            }
+
+            const copy = prev.slice();
+            copy[idxThinking] = thinkingMsg;
+            return copy;
+          }
+
+          if (isDone) {
+            const finalHtml = (data as any).answer ?? incoming ?? "";
+            const hasContent =
+              String(finalHtml)
+                .replace(/<[^>]*>/g, "")
+                .replace(/&nbsp;/g, " ")
+                .trim().length > 0;
+
+            if (!hasContent) {
+              return prev.filter(
+                (m) => !m.streaming && !String(m.id).endsWith("_thinking"),
+              );
+            }
+
+            const finalizedMsg: MessageResponse = {
+              id: messageId,
+              thread_module_id: threadModuleId!,
+              message: finalHtml,
+              user_id:
+                data.user_id != null ? Number(data.user_id as any) : null,
+              farmer_id: data.farmer_id != null ? String(data.farmer_id) : null,
+              sender_type: (data.sender_type as any) ?? "ai_agent",
+              sender_name: data.sender_name ?? "Aunkur AI",
+              created_at: new Date().toISOString(),
+              streaming: false,
+            };
+            const filtered = prev.filter(
+              (m) => !m.streaming && !String(m.id).endsWith("_thinking"),
+            );
+            return [...filtered, finalizedMsg];
+          }
+
+          if (
+            eventType === "token" ||
+            eventType === "content" ||
+            eventType === "status"
+          ) {
+            const withoutThinking = prev.filter(
+              (m) => !String(m.id).endsWith("_thinking"),
+            );
+
+            const streamingIndex = withoutThinking.findIndex(
+              (m) => m.streaming && m.thread_module_id === threadModuleId,
+            );
+
+            if (streamingIndex === -1) {
+              const newMsg: MessageResponse = {
+                id: messageId,
+                thread_module_id: threadModuleId!,
+                message: incoming,
+                user_id:
+                  data.user_id != null ? Number(data.user_id as any) : null,
+                farmer_id:
+                  data.farmer_id != null ? String(data.farmer_id) : null,
+                sender_type: (data.sender_type as any) ?? "ai_agent",
+                sender_name: data.sender_name ?? "Aunkur AI",
+                created_at: new Date().toISOString(),
+                streaming: true,
+              };
+              const filtered = withoutThinking.filter((m) => !m.streaming);
+              return [...filtered, newMsg];
+            }
+            const copy = withoutThinking.slice();
+            const existing = copy[streamingIndex];
+            copy[streamingIndex] = {
+              ...existing,
+              message: existing.message + incoming,
+              streaming: true,
+            };
+            return copy;
+          }
+
+          return prev;
+        });
+
+        if (
+          data.status === "done" ||
+          data.status === "complete" ||
+          data.status === "finished" ||
+          data.type === "done" ||
+          data.stream_data?.type === "done"
+        ) {
+          if (typingSafetyTimeoutRef.current) {
+            clearTimeout(typingSafetyTimeoutRef.current);
+            typingSafetyTimeoutRef.current = null;
+          }
+          setIsTyping(false);
+          setTypingUser("");
+        } else {
+          setIsTyping(true);
+          setTypingUser(data.sender_name ?? "AI");
+        }
+      };
+
+      unsubscribeStream = subscribeMessageStream(handleStream);
+    }
+
     const handleNewMessage = (message: MessageResponse) => {
       if (message.thread_module_id === threadModuleId) {
+        const messageText = String(message.message ?? "");
+        const hasContent =
+          messageText
+            .replace(/<[^>]*>/g, "")
+            .replace(/&nbsp;/g, " ")
+            .trim().length > 0;
+
+        if (!hasContent) {
+          return;
+        }
+
         setMessages((prev) => {
           const messageId = String(message.id);
           if (prev.some((m) => m.id === messageId)) {
@@ -331,13 +503,13 @@ export function useChat(
             raw.farmer_id ??
             raw.farmerId ??
             (resolvedSenderType === "farmer"
-              ? raw.sender_id ?? raw.senderId
+              ? (raw.sender_id ?? raw.senderId)
               : null);
           const rawUserId =
             raw.user_id ??
             raw.userId ??
             (resolvedSenderType === "user"
-              ? raw.sender_id ?? raw.senderId
+              ? (raw.sender_id ?? raw.senderId)
               : null);
 
           const normalizedFarmerId =
@@ -346,16 +518,16 @@ export function useChat(
             currentUserId
               ? currentUserId
               : rawFarmerId != null
-              ? String(rawFarmerId)
-              : null;
+                ? String(rawFarmerId)
+                : null;
           const normalizedUserId =
             resolvedSenderType === "user" &&
             currentUserType === "user" &&
             currentUserId
               ? Number(currentUserId)
               : rawUserId != null
-              ? Number(rawUserId)
-              : null;
+                ? Number(rawUserId)
+                : null;
 
           const senderName =
             (raw.sender_name as string) ??
@@ -368,26 +540,32 @@ export function useChat(
             typeof rawCreatedAt === "number"
               ? new Date(rawCreatedAt).toISOString()
               : typeof rawCreatedAt === "string"
-              ? rawCreatedAt
-              : new Date().toISOString();
+                ? rawCreatedAt
+                : new Date().toISOString();
 
-          return [
-            ...prev,
-            {
-              ...message,
-              id: messageId,
-              sender_type: resolvedSenderType,
-              sender_name: senderName,
-              farmer_id: normalizedFarmerId,
-              user_id: normalizedUserId,
-              created_at: createdAt,
-            },
-          ];
+          const finalizedMsg: MessageResponse = {
+            ...message,
+            id: messageId,
+            sender_type: resolvedSenderType,
+            sender_name: senderName,
+            farmer_id: normalizedFarmerId,
+            user_id: normalizedUserId,
+            created_at: createdAt,
+          };
+
+          const streamingIndex = prev.findIndex(
+            (m) => m.streaming && m.thread_module_id === threadModuleId,
+          );
+
+          if (streamingIndex !== -1) {
+            const copy = prev.slice();
+            copy[streamingIndex] = finalizedMsg;
+            return copy;
+          }
+
+          return [...prev, finalizedMsg];
         });
 
-        // Keep the typing bubble visible right up until the actual reply
-        // arrives, instead of hiding it on "typing:stop" (which can fire a
-        // moment before the message itself is delivered).
         const raw = message as unknown as Record<string, unknown>;
         const senderType = (
           (raw.sender_type as string) ??
@@ -431,11 +609,6 @@ export function useChat(
 
     const handleTypingStop = (data: { thread_module_id: number }) => {
       if (data.thread_module_id !== threadModuleId) return;
-
-      // Don't hide the bubble immediately — "typing:stop" can arrive a
-      // moment before the actual reply. Keep it up and let the reply
-      // message (in handleNewMessage) clear it. As a safety net, force
-      // it off if no reply shows up shortly after.
       if (typingSafetyTimeoutRef.current) {
         clearTimeout(typingSafetyTimeoutRef.current);
       }
@@ -460,8 +633,10 @@ export function useChat(
       if (data.thread_module_id === threadModuleId) {
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === data.message_id ? { ...msg, message: data.message } : msg
-          )
+            msg.id === data.message_id
+              ? { ...msg, message: data.message }
+              : msg,
+          ),
         );
       }
     };
@@ -483,6 +658,7 @@ export function useChat(
     socket.on("message:deleted", handleMessageDeleted);
 
     return () => {
+      if (unsubscribeStream) unsubscribeStream();
       socket.off("message:new", handleNewMessage);
       socket.off("typing:start", handleTypingStart);
       socket.off("typing:stop", handleTypingStop);
@@ -495,13 +671,20 @@ export function useChat(
       }
       ignore = true;
     };
-  }, [socket, threadModuleId, currentUserId, currentUserType, token]);
+  }, [
+    socket,
+    threadModuleId,
+    currentUserId,
+    currentUserType,
+    token,
+    subscribeMessageStream,
+  ]);
 
   const sendMessage = useCallback(
     (
       payload: Omit<SendMessagePayload, "thread_module_id"> & {
         thread_module_id?: number;
-      }
+      },
     ) => {
       if (!socket || !isConnected || !threadModuleId) return;
 
@@ -509,6 +692,8 @@ export function useChat(
         ...payload,
         thread_module_id: payload.thread_module_id ?? threadModuleId,
       };
+
+      setIsSending(true);
       socket.emit(
         "message:send",
         fullPayload,
@@ -517,13 +702,14 @@ export function useChat(
           message?: string;
           data?: MessageResponse;
         }) => {
+          setIsSending(false);
           if (!response.success) {
             console.error("Failed to send message:", response.message);
           }
-        }
+        },
       );
     },
-    [socket, isConnected, threadModuleId]
+    [socket, isConnected, threadModuleId],
   );
 
   const markSeen = useCallback(() => {
@@ -541,7 +727,7 @@ export function useChat(
         farmer_id: farmerId,
       });
     },
-    [socket, isConnected, threadModuleId]
+    [socket, isConnected, threadModuleId],
   );
 
   const emitTypingStop = useCallback(
@@ -553,7 +739,7 @@ export function useChat(
         farmer_id: farmerId,
       });
     },
-    [socket, isConnected, threadModuleId]
+    [socket, isConnected, threadModuleId],
   );
 
   return {
@@ -563,6 +749,7 @@ export function useChat(
     hasMorePages,
     isLoadingMore,
     isLoadingInitial,
+    isSending,
     sendMessage,
     markSeen,
     emitTypingStart,

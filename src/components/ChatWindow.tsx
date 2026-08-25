@@ -49,7 +49,7 @@ export function ChatWindow({
     }
 
     const newestMessage = messages.reduce((latest, msg) =>
-      msg.created_at.localeCompare(latest.created_at) > 0 ? msg : latest
+      msg.created_at.localeCompare(latest.created_at) > 0 ? msg : latest,
     );
 
     if (!hasInitiallyLoaded.current) {
@@ -89,7 +89,11 @@ export function ChatWindow({
       {messages.length === 0 && isLoadingInitial ? (
         <div className="flex items-center justify-center h-full">
           <div className="flex items-center gap-2 text-sm text-gray-400">
-            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <svg
+              className="w-5 h-5 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
               <circle
                 className="opacity-25"
                 cx="12"
@@ -183,7 +187,9 @@ export function ChatWindow({
                 }
               />
             ))}
-          {isTyping && <TypingIndicator userName={typingUser} />}
+          {!messages.some((m) => m.streaming) && isTyping && (
+            <TypingIndicator userName={typingUser} />
+          )}
           <div ref={messagesEndRef} />
         </div>
       )}
