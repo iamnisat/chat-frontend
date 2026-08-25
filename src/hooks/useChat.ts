@@ -346,7 +346,6 @@ export function useChat(
             };
 
             if (idxThinking === -1) {
-              // Remove any previous thinking messages (keep only one)
               const withoutThinking = prev.filter(
                 (m) => !String(m.id).endsWith("_thinking"),
               );

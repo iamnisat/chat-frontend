@@ -64,34 +64,34 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
   const isAI = message.sender_type === "ai_agent";
   const senderImage = getSenderImage(message);
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const prevMessageRef = useRef<string>(message.message || "");
 
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
-    if (message.streaming) {
-      el.textContent = message.message || "";
-    } else {
-      el.innerHTML = message.message || "";
-    }
-    prevMessageRef.current = message.message || "";
-  }, [message.id]);
 
-  useEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-    const prev = prevMessageRef.current || "";
     const next = message.message || "";
-    if (next === prev) return;
+
     if (message.streaming) {
-      const suffix = next.slice(prev.length);
-      if (suffix) {
-        el.appendChild(document.createTextNode(suffix));
+      const prev = el.textContent || "";
+      if (next === prev) return;
+
+      if (next.startsWith(prev)) {
+        const suffix = next.slice(prev.length);
+        if (suffix) {
+          el.appendChild(document.createTextNode(suffix));
+        }
+      } else {
+        el.textContent = next;
       }
-      el.innerHTML = next;
+      return;
     }
-    prevMessageRef.current = next;
-  }, [message.message, message.streaming]);
+
+    if (/<[^>]+>/.test(next)) {
+      el.innerHTML = next;
+    } else {
+      el.textContent = next;
+    }
+  }, [message.id, message.message, message.streaming]);
 
   return (
     <div

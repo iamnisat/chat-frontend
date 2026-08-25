@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createAdvisory, fetchConversations } from "../api";
+import Swal from "sweetalert2";
+import { createAdvisory, fetchConversations, fetchCrops } from "../api";
 import { ChatWindow } from "../components/ChatWindow";
 import { ConnectionStatus } from "../components/ConnectionStatus";
 import { MessageInput } from "../components/MessageInput";
@@ -20,6 +21,13 @@ function ChatContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [threads, setThreads] = useState<ThreadModule[]>([]);
   const [isCreatingThread, setIsCreatingThread] = useState(false);
+  const [showCropSelector, setShowCropSelector] = useState(false);
+  const [cropOptions, setCropOptions] = useState<
+    Array<{ id: number; name: string }>
+  >([]);
+  const [selectedCropId, setSelectedCropId] = useState<number | null>(null);
+  const [selectedCropName, setSelectedCropName] = useState<string>("");
+  const [isLoadingCrops, setIsLoadingCrops] = useState(false);
   const { joinThread, leaveThread, socket, deleteThread } = useSocketContext();
   const [userData, setUserData] = useState<UserPayload | null>(null);
   const chat = useChat(
@@ -144,24 +152,121 @@ function ChatContent() {
     }
   }, [userData?.token]);
 
+  const loadCrops = useCallback(async () => {
+    if (!userData?.token || !userData?.farmer_id) return;
+
+    setIsLoadingCrops(true);
+    try {
+      const json = await fetchCrops(userData.token, 1, 100);
+      const rawCrops = Array.isArray(json?.data)
+        ? json.data
+        : Array.isArray(json?.data?.items)
+          ? json.data.items
+          : Array.isArray(json?.data?.crops)
+            ? json.data.crops
+            : [];
+
+      const normalized = rawCrops
+        .map((crop: Record<string, unknown>) => ({
+          id: Number(crop.id ?? crop.crop_id ?? crop.cropId),
+          name: String(crop.name ?? crop.crop_name ?? crop.cropName ?? "Crop"),
+        }))
+        .filter((crop: { id: number; name: string }) =>
+          Number.isFinite(crop.id),
+        );
+
+      setCropOptions(normalized);
+      const firstCropId = normalized[0]?.id ?? null;
+      setSelectedCropId((prev) => prev ?? firstCropId);
+    } finally {
+      setIsLoadingCrops(false);
+    }
+  }, [userData?.token, userData?.farmer_id]);
+
+  const openCreateThreadDialog = useCallback(async () => {
+    setSelectedCropId(null);
+    setSelectedCropName("");
+    await loadCrops();
+    setShowCropSelector(true);
+  }, [loadCrops]);
+
   const handleCreateThread = useCallback(async () => {
     if (!userData?.token || !userData?.farmer_id || isCreatingThread) return;
+    if (!selectedCropId) return;
+
+    const existingThread = threads.find((thread) => {
+      const threadName = thread.name?.trim().toLowerCase();
+      const cropName = selectedCropName.trim().toLowerCase();
+      return !!threadName && !!cropName && threadName === cropName;
+    });
+
+    if (existingThread) {
+      if (selectedThread !== existingThread.id) {
+        setSelectedThread(existingThread.id);
+        joinThread(existingThread.id);
+      }
+      setShowCropSelector(false);
+      setSidebarOpen(false);
+      await Swal.fire({
+        title: "Conversation already exists",
+        text: `Opening the existing conversation for ${selectedCropName}.`,
+        icon: "info",
+        confirmButtonColor: "#7c3aed",
+      });
+      return;
+    }
+
     setIsCreatingThread(true);
     try {
       const json = await createAdvisory(
+        Number(selectedCropId),
         userData.token,
         Number(userData.farmer_id),
       );
+
       if (json.success && json.data?.id) {
         await refreshThreads();
-        setSelectedThread(json.data.id);
-        joinThread(json.data.id);
+        const targetThreadId = Number(json.data.id);
+        setSelectedThread(targetThreadId);
+        joinThread(targetThreadId);
         setSidebarOpen(false);
+        // await Swal.fire({
+        //   title: "Conversation created",
+        //   text: `${json.message}`,
+        //   icon: "success",
+        //   confirmButtonColor: "#7c3aed",
+        // });
+        return;
       }
+
+      // await Swal.fire({
+      //   title: "Conversation not created",
+      //   text: "Something went wrong while creating the conversation.",
+      //   icon: "error",
+      //   confirmButtonColor: "#7c3aed",
+      // });
+    } catch (error) {
+      console.log(error);
+      // await Swal.fire({
+      //   title: "Conversation not created",
+      //   text: error instanceof Error ? error.message : "Please try again.",
+      //   icon: "error",
+      //   confirmButtonColor: "#7c3aed",
+      // });
     } finally {
       setIsCreatingThread(false);
+      setShowCropSelector(false);
     }
-  }, [userData, isCreatingThread, refreshThreads, joinThread]);
+  }, [
+    userData,
+    isCreatingThread,
+    selectedCropId,
+    selectedCropName,
+    threads,
+    selectedThread,
+    refreshThreads,
+    joinThread,
+  ]);
 
   const handleDeleteThread = useCallback(
     async (threadId: number) => {
@@ -338,11 +443,82 @@ function ChatContent() {
           threads={threads}
           selectedThread={selectedThread}
           onSelectThread={handleSelectThread}
-          onCreateThread={handleCreateThread}
+          onCreateThread={openCreateThreadDialog}
           onDeleteThread={handleDeleteThread}
           isCreatingThread={isCreatingThread}
         />
       </div>
+
+      {showCropSelector && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl border border-purple-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800">Select crop</h3>
+              <button
+                onClick={() => setShowCropSelector(false)}
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+                aria-label="Close crop selector"
+              >
+                ×
+              </button>
+            </div>
+
+            {isLoadingCrops ? (
+              <div className="flex items-center justify-center py-8 text-sm text-gray-500">
+                Loading crops...
+              </div>
+            ) : cropOptions.length === 0 ? (
+              <div className="py-6 text-center text-sm text-gray-500">
+                No crops found for this farmer.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {cropOptions.map((crop) => (
+                  <button
+                    key={crop.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCropId(crop.id);
+                      setSelectedCropName(crop.name);
+                    }}
+                    className={`w-full text-left rounded-xl border px-3 py-2.5 transition ${
+                      selectedCropId === crop.id
+                        ? "border-purple-300 bg-purple-50 text-purple-700"
+                        : "border-gray-200 hover:border-purple-200 hover:bg-purple-50/50 text-gray-700"
+                    }`}
+                  >
+                    {crop.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {!isLoadingCrops && cropOptions.length > 0 && (
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCropSelector(false)}
+                  className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!selectedCropId) return;
+                    await handleCreateThread();
+                  }}
+                  disabled={!selectedCropId || isCreatingThread}
+                  className="px-3 py-2 text-sm text-white rounded-lg shadow-sm disabled:opacity-60"
+                  style={{ background: "var(--own-gradient)" }}
+                >
+                  {isCreatingThread ? "Creating..." : "Create conversation"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -352,7 +528,7 @@ function ChatContent() {
             threads={threads}
             selectedThread={selectedThread}
             onSelectThread={handleSelectThread}
-            onCreateThread={handleCreateThread}
+            onCreateThread={openCreateThreadDialog}
             onDeleteThread={handleDeleteThread}
             isCreatingThread={isCreatingThread}
           />
