@@ -22,6 +22,19 @@ const LANGUAGE_OPTIONS: { value: LanguageType; label: string }[] = [
   { value: "ar", label: "العربية" },
 ];
 
+// BCP-47 locale tags the Web Speech API expects, one per supported
+// language, so dictation is recognized in the same language as replies.
+const SPEECH_LOCALE: Record<LanguageType, string> = {
+  bn: "bn-BD",
+  en: "en-US",
+  ar: "ar-SA",
+};
+
+function getSpeechRecognitionCtor(): SpeechRecognitionConstructor | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window.SpeechRecognition ?? window.webkitSpeechRecognition;
+}
+
 export function MessageInput({
   onSendMessage,
   onTypingStart,
@@ -33,8 +46,14 @@ export function MessageInput({
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [language, setLanguage] = useState<LanguageType>("bn");
+  const [isListening, setIsListening] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // Text already in the box when dictation started — final transcripts are
+  // appended after this instead of overwriting it.
+  const baseMessageRef = useRef("");
+  const speechSupported = getSpeechRecognitionCtor() != null;
 
   const handleTyping = useCallback(() => {
     if (!isTyping) {
@@ -60,6 +79,75 @@ export function MessageInput({
     };
   }, []);
 
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+  }, []);
+
+  const startListening = useCallback(() => {
+    if (disabled || isListening) return;
+    const SpeechRecognitionCtor = getSpeechRecognitionCtor();
+    if (!SpeechRecognitionCtor) return;
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = SPEECH_LOCALE[language];
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    // Dictation appends onto whatever was already typed, so keep it as
+    // the fixed prefix and only replace the part after it as speech comes in.
+    baseMessageRef.current = message.trim() ? `${message.trim()} ` : "";
+
+    recognition.onresult = (event) => {
+      let finalTranscript = "";
+      let interimTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        const transcript = result[0]?.transcript ?? "";
+        if (result.isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      if (finalTranscript) {
+        baseMessageRef.current = `${baseMessageRef.current}${finalTranscript} `;
+      }
+
+      const combined = `${baseMessageRef.current}${interimTranscript}`.trimStart();
+      if (combined.length <= MAX_CHARS) {
+        setMessage(combined);
+        handleTyping();
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }, [disabled, isListening, language, message, handleTyping]);
+
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  }, [isListening, startListening, stopListening]);
+
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+    };
+  }, []);
+
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     if (value.length <= MAX_CHARS) {
@@ -77,6 +165,10 @@ export function MessageInput({
 
   const handleSend = () => {
     if (isSending) return;
+
+    if (isListening) {
+      stopListening();
+    }
 
     const trimmed = message.trim();
     if (trimmed && trimmed.length <= MAX_CHARS) {
@@ -134,6 +226,40 @@ export function MessageInput({
             rows={1}
             maxLength={MAX_CHARS + 100}
           />
+          {speechSupported && (
+            <button
+              type="button"
+              onClick={toggleListening}
+              disabled={disabled}
+              className={`m-1.5 p-2.5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                isListening
+                  ? "text-white shadow-md animate-thinking-glow"
+                  : "text-gray-400 hover:text-purple-500 hover:bg-purple-50"
+              }`}
+              style={isListening ? { background: "var(--own-gradient)" } : undefined}
+              aria-pressed={isListening}
+              aria-label={
+                isListening
+                  ? "Stop voice input"
+                  : `Speak in ${LANGUAGE_OPTIONS.find((o) => o.value === language)?.label ?? "selected language"}`
+              }
+              title={isListening ? "Stop voice input" : "Voice input"}
+            >
+              {isListening ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+                  />
+                </svg>
+              )}
+            </button>
+          )}
           <button
             onClick={handleSend}
             disabled={disabled || isSending || !hasText || isOverLimit}

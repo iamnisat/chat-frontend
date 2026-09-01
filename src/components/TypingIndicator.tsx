@@ -10,7 +10,10 @@ interface TypingIndicatorProps {
 const CHARS_PER_TICK = 2;
 const TICK_MS = 18;
 
-export function TypingIndicator({ userName, thinkingText }: TypingIndicatorProps) {
+export function TypingIndicator({
+  userName,
+  thinkingText,
+}: TypingIndicatorProps) {
   const target = thinkingText?.trim() ?? "";
   const [displayedText, setDisplayedText] = useState("");
   const displayedRef = useRef("");
@@ -71,7 +74,9 @@ export function TypingIndicator({ userName, thinkingText }: TypingIndicatorProps
             {target ? (
               <span className="text-xs font-medium thinking-shimmer-text whitespace-pre-wrap break-words">
                 {displayedText}
-                {isRevealing && <span className="stream-cursor" aria-hidden="true" />}
+                {isRevealing && (
+                  <span className="stream-cursor" aria-hidden="true" />
+                )}
               </span>
             ) : (
               <span className="text-xs font-semibold thinking-shimmer-text">
@@ -97,9 +102,18 @@ export function TypingIndicator({ userName, thinkingText }: TypingIndicatorProps
 
         {!target && (
           <div className="mt-2.5 space-y-1.5 pl-8">
-            <div className="h-2 w-full thinking-shimmer-bar" style={{ animationDelay: "0ms" }} />
-            <div className="h-2 w-4/5 thinking-shimmer-bar" style={{ animationDelay: "120ms" }} />
-            <div className="h-2 w-3/5 thinking-shimmer-bar" style={{ animationDelay: "240ms" }} />
+            <div
+              className="h-2 w-full thinking-shimmer-bar"
+              style={{ animationDelay: "0ms" }}
+            />
+            <div
+              className="h-2 w-4/5 thinking-shimmer-bar"
+              style={{ animationDelay: "120ms" }}
+            />
+            <div
+              className="h-2 w-3/5 thinking-shimmer-bar"
+              style={{ animationDelay: "240ms" }}
+            />
           </div>
         )}
       </div>
