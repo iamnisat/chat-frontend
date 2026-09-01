@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
 interface MessageInputProps {
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, cropName?: string) => void;
   onTypingStart: () => void;
   onTypingStop: () => void;
   disabled?: boolean;
   isSending?: boolean;
+  cropName?: string;
 }
 
 const MAX_CHARS = 5000;
@@ -16,6 +17,7 @@ export function MessageInput({
   onTypingStop,
   disabled,
   isSending = false,
+  cropName,
 }: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -66,7 +68,7 @@ export function MessageInput({
 
     const trimmed = message.trim();
     if (trimmed && trimmed.length <= MAX_CHARS) {
-      onSendMessage(trimmed);
+      onSendMessage(trimmed, cropName?.trim() || undefined);
       setMessage("");
       if (isTyping) {
         setIsTyping(false);

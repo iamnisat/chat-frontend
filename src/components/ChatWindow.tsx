@@ -28,6 +28,7 @@ export function ChatWindow({
   isLoadingInitial,
   onLoadMore,
 }: ChatWindowProps) {
+  console.log("🚀 ~ ChatWindow ~ messages:", messages);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasInitiallyLoaded = useRef(false);
   const lastMessageIdRef = useRef<string | number | null>(null);
@@ -60,9 +61,6 @@ export function ChatWindow({
       });
       return;
     }
-
-    // Scroll to the newest message whenever it changes (new message sent or
-    // received), so the latest message always sits just above the input.
     if (newestMessage.id !== lastMessageIdRef.current) {
       lastMessageIdRef.current = newestMessage.id;
       requestAnimationFrame(() => {
@@ -73,7 +71,6 @@ export function ChatWindow({
 
   useEffect(() => {
     if (!isTyping || !hasInitiallyLoaded.current) return;
-    // Keep the typing bubble in view as it appears below the last message.
     requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     });
