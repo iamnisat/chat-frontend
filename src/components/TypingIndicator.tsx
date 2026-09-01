@@ -14,7 +14,9 @@ export function TypingIndicator({
   userName,
   thinkingText,
 }: TypingIndicatorProps) {
-  const target = thinkingText?.trim() ?? "";
+  // Strip a trailing "..."/"…" from the raw text — the animated dots next
+  // to it already signal "still going," so a literal ellipsis is redundant.
+  const target = (thinkingText?.trim() ?? "").replace(/(\.{2,}|…)\s*$/, "");
   const [displayedText, setDisplayedText] = useState("");
   const displayedRef = useRef("");
   const targetRef = useRef("");
