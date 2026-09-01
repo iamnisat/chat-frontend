@@ -1,14 +1,51 @@
+import { useEffect, useRef, useState } from "react";
+
 interface TypingIndicatorProps {
   userName: string;
   thinkingText?: string;
 }
 
-export function TypingIndicator({
-  userName,
-  thinkingText,
-}: TypingIndicatorProps) {
-  const trimmedThinking = thinkingText?.trim();
-  console.log("trimmedThinking: ", trimmedThinking);
+// How many characters to reveal per tick, and how often — tuned to read as
+// a smooth Claude-style typewriter rather than a jarring instant swap.
+const CHARS_PER_TICK = 2;
+const TICK_MS = 18;
+
+export function TypingIndicator({ userName, thinkingText }: TypingIndicatorProps) {
+  const target = thinkingText?.trim() ?? "";
+  const [displayedText, setDisplayedText] = useState("");
+  const displayedRef = useRef("");
+  const targetRef = useRef("");
+
+  // Track the latest target text. If the new text isn't a continuation of
+  // what's already shown (a fresh turn, or replaced rather than extended
+  // content) restart the reveal instead of diffing mid-word.
+  useEffect(() => {
+    targetRef.current = target;
+    if (!target) {
+      displayedRef.current = "";
+      setDisplayedText("");
+    } else if (!target.startsWith(displayedRef.current)) {
+      displayedRef.current = "";
+    }
+  }, [target]);
+
+  // A single persistent ticker that gradually catches the displayed text
+  // up to the target, character by character — this is what produces the
+  // typewriter feel regardless of how choppy the underlying updates are.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const full = targetRef.current;
+      const current = displayedRef.current;
+      if (current.length < full.length) {
+        const next = full.slice(0, current.length + CHARS_PER_TICK);
+        displayedRef.current = next;
+        setDisplayedText(next);
+      }
+    }, TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  const isRevealing = displayedText.length < target.length;
 
   return (
     <div className="flex justify-start mb-3 animate-fade-in-up">
@@ -31,9 +68,10 @@ export function TypingIndicator({
           </div>
 
           <div className="flex items-center gap-2 min-w-0">
-            {trimmedThinking ? (
+            {target ? (
               <span className="text-xs font-medium thinking-shimmer-text whitespace-pre-wrap break-words">
-                {trimmedThinking}
+                {displayedText}
+                {isRevealing && <span className="stream-cursor" aria-hidden="true" />}
               </span>
             ) : (
               <span className="text-xs font-semibold thinking-shimmer-text">
@@ -57,20 +95,11 @@ export function TypingIndicator({
           </div>
         </div>
 
-        {!trimmedThinking && (
+        {!target && (
           <div className="mt-2.5 space-y-1.5 pl-8">
-            <div
-              className="h-2 w-full thinking-shimmer-bar"
-              style={{ animationDelay: "0ms" }}
-            />
-            <div
-              className="h-2 w-4/5 thinking-shimmer-bar"
-              style={{ animationDelay: "120ms" }}
-            />
-            <div
-              className="h-2 w-3/5 thinking-shimmer-bar"
-              style={{ animationDelay: "240ms" }}
-            />
+            <div className="h-2 w-full thinking-shimmer-bar" style={{ animationDelay: "0ms" }} />
+            <div className="h-2 w-4/5 thinking-shimmer-bar" style={{ animationDelay: "120ms" }} />
+            <div className="h-2 w-3/5 thinking-shimmer-bar" style={{ animationDelay: "240ms" }} />
           </div>
         )}
       </div>
