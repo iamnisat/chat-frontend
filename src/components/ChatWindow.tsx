@@ -9,6 +9,7 @@ interface ChatWindowProps {
   currentUserType: "farmer" | "user";
   isTyping: boolean;
   typingUser: string;
+  thinkingText?: string;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   hasMorePages: boolean;
   isLoadingMore: boolean;
@@ -22,6 +23,7 @@ export function ChatWindow({
   currentUserType,
   isTyping,
   typingUser,
+  thinkingText,
   messagesEndRef,
   hasMorePages,
   isLoadingMore,
@@ -183,9 +185,13 @@ export function ChatWindow({
                 }
               />
             ))}
-          {!messages.some((m) => m.streaming) && isTyping && (
-            <TypingIndicator userName={typingUser} />
-          )}
+          {isTyping &&
+            (thinkingText?.trim() || !messages.some((m) => m.streaming)) && (
+              <TypingIndicator
+                userName={typingUser}
+                thinkingText={thinkingText}
+              />
+            )}
           <div ref={messagesEndRef} />
         </div>
       )}

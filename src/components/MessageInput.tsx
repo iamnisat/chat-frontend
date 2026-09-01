@@ -1,7 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import type { LanguageType } from "../types";
 
 interface MessageInputProps {
-  onSendMessage: (message: string, cropName?: string) => void;
+  onSendMessage: (
+    message: string,
+    cropName?: string,
+    language?: LanguageType
+  ) => void;
   onTypingStart: () => void;
   onTypingStop: () => void;
   disabled?: boolean;
@@ -10,6 +15,12 @@ interface MessageInputProps {
 }
 
 const MAX_CHARS = 5000;
+
+const LANGUAGE_OPTIONS: { value: LanguageType; label: string }[] = [
+  { value: "bn", label: "বাংলা" },
+  { value: "en", label: "English" },
+  { value: "ar", label: "العربية" },
+];
 
 export function MessageInput({
   onSendMessage,
@@ -21,6 +32,7 @@ export function MessageInput({
 }: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [language, setLanguage] = useState<LanguageType>("bn");
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -68,7 +80,7 @@ export function MessageInput({
 
     const trimmed = message.trim();
     if (trimmed && trimmed.length <= MAX_CHARS) {
-      onSendMessage(trimmed, cropName?.trim() || undefined);
+      onSendMessage(trimmed, cropName?.trim() || undefined, language);
       setMessage("");
       if (isTyping) {
         setIsTyping(false);
@@ -94,6 +106,21 @@ export function MessageInput({
   return (
     <div className="border-t border-purple-100 bg-white px-4 py-3 flex-shrink-0">
       <div className="max-w-3xl mx-auto">
+        <div className="mb-1.5 flex justify-end">
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as LanguageType)}
+            disabled={disabled}
+            aria-label="Reply language"
+            className="text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-100 focus:border-purple-300 disabled:opacity-50"
+          >
+            {LANGUAGE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="flex items-end gap-2 bg-gray-50 rounded-2xl border border-gray-200 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-100 transition-all">
           <textarea
             ref={textareaRef}

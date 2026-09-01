@@ -1,5 +1,7 @@
 export type LoginType = "farmer" | "user";
 
+export type LanguageType = "bn" | "en" | "ar";
+
 export interface MessageSender {
   id: number;
   name: string;
@@ -39,6 +41,7 @@ export interface SendMessagePayload {
   message: string;
   farmer_id?: string;
   crop_name?: string;
+  language_type?: LanguageType;
   user_id?: number;
   sender_type?: LoginType | "ai_agent";
   client_id?: string;

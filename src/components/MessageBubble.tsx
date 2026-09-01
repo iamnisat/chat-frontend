@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import type { MessageResponse } from "../types";
-import { TypingIndicator } from "./TypingIndicator";
 
 const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "";
 
@@ -64,6 +63,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
   const isAI = message.sender_type === "ai_agent";
   const senderImage = getSenderImage(message);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const cursorRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -72,20 +72,38 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     const next = message.message || "";
 
     if (message.streaming) {
-      const prev = el.textContent || "";
-      if (next === prev) return;
-
-      if (next.startsWith(prev)) {
-        const suffix = next.slice(prev.length);
-        if (suffix) {
-          el.appendChild(document.createTextNode(suffix));
-        }
-      } else {
-        el.textContent = next;
+      // Drop the trailing caret before diffing so it isn't counted as
+      // rendered text, then re-append it after the new chunk.
+      if (cursorRef.current && cursorRef.current.parentNode === el) {
+        el.removeChild(cursorRef.current);
       }
+
+      const prev = el.textContent || "";
+      if (next !== prev) {
+        if (next.startsWith(prev)) {
+          const suffix = next.slice(prev.length);
+          if (suffix) {
+            // Wrap just the newly-arrived chunk so it fades/lifts into
+            // place, Claude-style, instead of popping in instantly.
+            const span = document.createElement("span");
+            span.className = "token-fade-in";
+            span.textContent = suffix;
+            el.appendChild(span);
+          }
+        } else {
+          el.textContent = next;
+        }
+      }
+
+      const cursor = document.createElement("span");
+      cursor.className = "stream-cursor";
+      cursor.setAttribute("aria-hidden", "true");
+      el.appendChild(cursor);
+      cursorRef.current = cursor;
       return;
     }
 
+    cursorRef.current = null;
     if (/<[^>]+>/.test(next)) {
       el.innerHTML = next;
     } else {
@@ -149,11 +167,6 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
         )}
         <div className="text-sm ai-message-content">
           <div ref={contentRef} />
-          {message.streaming && (
-            <div className="mt-2 text-xs text-gray-400">
-              <TypingIndicator userName={""} />
-            </div>
-          )}
         </div>
         <div
           className={`text-[10px] mt-1.5 ${isOwn ? "text-white/70" : "text-gray-400"}`}

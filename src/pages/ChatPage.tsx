@@ -8,7 +8,7 @@ import { MessageInput } from "../components/MessageInput";
 import { ThreadList } from "../components/ThreadList";
 import { SocketProvider, useSocketContext } from "../context/SocketContext";
 import { useChat } from "../hooks/useChat.ts";
-import type { ThreadModule, UserPayload } from "../types";
+import type { LanguageType, ThreadModule, UserPayload } from "../types";
 
 const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "";
 const GENERAL_THREAD_NAME = "General";
@@ -385,7 +385,7 @@ function ChatContent() {
     return hasBangla ? cleanedCropName : "";
   };
   const handleSendMessage = useCallback(
-    (message: string, cropName?: string) => {
+    (message: string, cropName?: string, language: LanguageType = "bn") => {
       if (!userData) return;
 
       const resolvedCropName =
@@ -403,6 +403,7 @@ function ChatContent() {
         farmer_id: userData.farmer_id,
         sender_type: userData.login_type,
         crop_name: cropNameWithoutEnglish,
+        language_type: language,
       });
     },
     [chat, userData, selectedCropName, selectedThreadName]
@@ -712,6 +713,7 @@ function ChatContent() {
                   currentUserType={userData.login_type ?? "user"}
                   isTyping={chat.isTyping}
                   typingUser={chat.typingUser}
+                  thinkingText={chat.thinkingText}
                   messagesEndRef={chat.messagesEndRef}
                   hasMorePages={chat.hasMorePages}
                   isLoadingMore={chat.isLoadingMore}

@@ -21,10 +21,13 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -45,28 +48,179 @@ html, body, #root {
 
 /* Animations */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-16px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(16px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes pulse-ring {
-  0% { transform: scale(0.8); opacity: 1; }
-  100% { transform: scale(2.2); opacity: 0; }
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-6px); }
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes thinkingGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(124, 58, 237, 0);
+  }
+}
+
+@keyframes thinkingSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes thinkingShimmer {
+  0% {
+    background-position: 200% 50%;
+  }
+  100% {
+    background-position: -200% 50%;
+  }
+}
+
+@keyframes thinkingDot {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0) scale(0.85);
+    opacity: 0.5;
+  }
+  40% {
+    transform: translateY(-5px) scale(1.15);
+    opacity: 1;
+  }
+}
+
+.animate-thinking-glow {
+  animation: thinkingGlow 1.8s ease-in-out infinite;
+}
+
+.animate-thinking-spin {
+  animation: thinkingSpin 2.2s linear infinite;
+}
+
+.thinking-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--text-secondary) 40%,
+    var(--primary) 50%,
+    var(--text-secondary) 60%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: thinkingShimmer 2.2s linear infinite;
+}
+
+.animate-thinking-dot {
+  animation: thinkingDot 1.2s ease-in-out infinite;
+}
+
+/* Claude-style streaming text: each newly-arrived chunk gently fades/lifts
+   into place, with a blinking caret trailing the latest character while
+   the response is still streaming in. */
+@keyframes tokenFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cursorBlink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  95% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.token-fade-in {
+  display: inline;
+  animation: tokenFadeIn 0.35s ease-out;
+}
+
+.stream-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--primary);
+  animation: cursorBlink 0.5s steps(1) infinite;
+}
+
+.thinking-shimmer-bar {
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(124, 58, 237, 0.1) 25%,
+    rgba(124, 58, 237, 0.28) 50%,
+    rgba(124, 58, 237, 0.1) 75%
+  );
+  background-size: 400% 100%;
+  animation: thinkingShimmer 1.6s ease-in-out infinite;
 }
 
 .animate-fade-in-up {
@@ -130,7 +284,7 @@ html, body, #root {
   padding: 0.125rem 0.375rem;
   border-radius: 0.375rem;
   font-size: 0.8125rem;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
 }
 
 .ai-message-content pre {
@@ -158,9 +312,15 @@ html, body, #root {
   color: #1e1b4b;
 }
 
-.ai-message-content h1 { font-size: 1.125rem; }
-.ai-message-content h2 { font-size: 1rem; }
-.ai-message-content h3 { font-size: 0.875rem; }
+.ai-message-content h1 {
+  font-size: 1.125rem;
+}
+.ai-message-content h2 {
+  font-size: 1rem;
+}
+.ai-message-content h3 {
+  font-size: 0.875rem;
+}
 
 .ai-message-content table {
   border-collapse: collapse;

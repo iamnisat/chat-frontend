@@ -122,6 +122,7 @@ export function useChat(
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState<string>("");
+  const [thinkingText, setThinkingText] = useState<string>("");
   const [hasMorePages, setHasMorePages] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(false);
@@ -210,6 +211,7 @@ export function useChat(
 
     let ignore = false;
     setMessages([]);
+    setThinkingText("");
     setIsLoadingInitial(true);
 
     if (token) {
@@ -309,18 +311,68 @@ export function useChat(
             `stream_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
         );
 
-        setMessages((prev) => {
-          const stream = data.stream_data;
-          const eventType = (stream?.type ?? data.type ?? "") as string;
-          const streamStatus = stream?.status ?? data.status ?? null;
+        const stream = data.stream_data;
+        console.log("stream: ", stream);
+        const eventType = (stream?.type ?? data.type ?? "") as string;
+        const streamStatus = (stream?.status ?? data.status ?? "") as string;
+        // Backends have been observed signalling the "thinking" phase via
+        // either the event type or the status field — match both so we
+        // don't silently miss it if one is used instead of the other.
+        const isThinkingEvent =
+          eventType === "thinking" || streamStatus === "thinking";
 
-          // Helper to detect 'done' statuses
-          const isDone =
-            streamStatus === "done" ||
-            streamStatus === "complete" ||
-            streamStatus === "finished" ||
-            eventType === "done" ||
-            data.type === "done";
+        if (import.meta.env.DEV) {
+          // Temporary diagnostic: if the live thinking indicator still
+          // doesn't show, check the console for the raw payload shape.
+          console.debug("[useChat] message:stream", {
+            eventType,
+            streamStatus,
+            isThinkingEvent,
+            data,
+          });
+        }
+
+        // Computed once here (rather than separately inside setMessages and
+        // in the completion check below) so both stay in sync regardless of
+        // whether the backend signals completion via a nested or top-level
+        // status/type field.
+        const isDone =
+          streamStatus === "done" ||
+          streamStatus === "complete" ||
+          streamStatus === "finished" ||
+          eventType === "done" ||
+          data.type === "done";
+
+        if (isThinkingEvent) {
+          // The backend has been inconsistent about which key carries the
+          // actual thinking text across events, so check every field name
+          // we've seen used for streamed content anywhere in this payload.
+          const knownContent = (stream?.content ??
+            stream?.text ??
+            stream?.thought ??
+            stream?.thinking ??
+            stream?.message ??
+            stream?.reasoning ??
+            stream?.chunk ??
+            stream?.delta ??
+            stream?.data ??
+            data.content ??
+            "") as string;
+
+          // TEMP DIAGNOSTIC: none of the known keys matched — show the raw
+          // stream_data on screen (instead of only in the console) so we
+          // can see, without devtools, exactly which key actually holds
+          // the text and fix the lookup above for real.
+          const thinkingContent =
+            knownContent || (stream ? `[debug] ${JSON.stringify(stream)}` : "");
+          setThinkingText(thinkingContent);
+        } else if (eventType || streamStatus) {
+          // Any non-thinking event means the actual answer has started
+          // streaming (or the turn is done) — drop the thinking preview.
+          setThinkingText("");
+        }
+
+        setMessages((prev) => {
           let incoming =
             (stream?.content as string) ?? (data.content as string) ?? "";
           if (eventType === "token" && incoming.startsWith(" ")) {
@@ -330,31 +382,11 @@ export function useChat(
             }
           }
           if (eventType === "thinking") {
-            const thinkingId = `${messageId}_thinking`;
-            const idxThinking = prev.findIndex((m) => m.id === thinkingId);
-            const thinkingMsg: MessageResponse = {
-              id: thinkingId,
-              thread_module_id: threadModuleId!,
-              message: incoming,
-              user_id:
-                data.user_id != null ? Number(data.user_id as any) : null,
-              farmer_id: data.farmer_id != null ? String(data.farmer_id) : null,
-              sender_type: (data.sender_type as any) ?? "ai_agent",
-              sender_name: data.sender_name ?? "Aunkur AI",
-              created_at: new Date().toISOString(),
-              streaming: false,
-            };
-
-            if (idxThinking === -1) {
-              const withoutThinking = prev.filter(
-                (m) => !String(m.id).endsWith("_thinking")
-              );
-              return [...withoutThinking, thinkingMsg];
-            }
-
-            const copy = prev.slice();
-            copy[idxThinking] = thinkingMsg;
-            return copy;
+            // "thinking" chunks aren't rendered as a message bubble — the
+            // text is shown inline in the typing indicator (thinkingText,
+            // set below) with a shimmer effect instead. Just drop any
+            // stale thinking placeholder from a previous implementation.
+            return prev.filter((m) => !String(m.id).endsWith("_thinking"));
           }
 
           if (isDone) {
@@ -432,19 +464,14 @@ export function useChat(
           return prev;
         });
 
-        if (
-          data.status === "done" ||
-          data.status === "complete" ||
-          data.status === "finished" ||
-          data.type === "done" ||
-          data.stream_data?.type === "done"
-        ) {
+        if (isDone) {
           if (typingSafetyTimeoutRef.current) {
             clearTimeout(typingSafetyTimeoutRef.current);
             typingSafetyTimeoutRef.current = null;
           }
           setIsTyping(false);
           setTypingUser("");
+          setThinkingText("");
         } else {
           setIsTyping(true);
           setTypingUser(data.sender_name ?? "AI");
@@ -741,6 +768,7 @@ export function useChat(
     messages,
     isTyping,
     typingUser,
+    thinkingText,
     hasMorePages,
     isLoadingMore,
     isLoadingInitial,
