@@ -15,6 +15,7 @@ interface ThreadListProps {
   onDeleteThread?: (threadId: number) => void;
   className?: string;
   isCreatingThread?: boolean;
+  isLoadingThreads?: boolean;
   createButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
@@ -26,7 +27,17 @@ const THREAD_ICONS: Record<number, string> = {
 
 const DEFAULT_ICON = "M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z";
 
-export function ThreadList({ threads, selectedThread, onSelectThread, onCreateThread, onDeleteThread, className = "", isCreatingThread, createButtonRef }: ThreadListProps) {
+export function ThreadList({
+  threads,
+  selectedThread,
+  onSelectThread,
+  onCreateThread,
+  onDeleteThread,
+  className = "",
+  isCreatingThread,
+  isLoadingThreads,
+  createButtonRef,
+}: ThreadListProps) {
   const handleDelete = (e: React.MouseEvent, threadId: number) => {
     e.stopPropagation();
     if (onDeleteThread && window.confirm("Delete this thread?")) {
@@ -40,7 +51,11 @@ export function ThreadList({ threads, selectedThread, onSelectThread, onCreateTh
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-gray-800">Conversations</h2>
-            <p className="text-xs text-gray-400 mt-0.5">{threads.length} threads available</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {isLoadingThreads
+                ? "Loading..."
+                : `${threads.length} threads available`}
+            </p>
           </div>
           {onCreateThread && (
             <button
@@ -51,13 +66,38 @@ export function ThreadList({ threads, selectedThread, onSelectThread, onCreateTh
               title="New conversation"
             >
               {isCreatingThread ? (
-                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                <svg
+                  className="w-5 h-5 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
                 </svg>
               ) : (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4.5v15m7.5-7.5h-15"
+                  />
                 </svg>
               )}
             </button>
@@ -66,70 +106,112 @@ export function ThreadList({ threads, selectedThread, onSelectThread, onCreateTh
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1.5">
-        {threads.map((thread, index) => {
-          const isSelected = selectedThread === thread.id;
-          const icon = THREAD_ICONS[thread.id] || DEFAULT_ICON;
-
-          return (
-            <button
-              key={thread.id}
-              onClick={() => onSelectThread(thread.id)}
-              className={`w-full text-left px-3.5 py-3 rounded-xl transition-all duration-200 group ${
-                isSelected
-                  ? "bg-white shadow-md shadow-purple-100 scale-[1.02]"
-                  : "hover:bg-white/60 hover:shadow-sm"
-              }`}
-              style={{
-                animationDelay: `${index * 50}ms`,
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
-                    isSelected ? "shadow-sm" : ""
-                  }`}
-                  style={{
-                    background: isSelected
-                      ? "var(--own-gradient)"
-                      : "linear-gradient(135deg, #f3e8ff 0%, #ede9fe 100%)",
-                  }}
-                >
-                  <svg
-                    className={`w-5 h-5 ${isSelected ? "text-white" : "text-purple-400"}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
-                  </svg>
+        {isLoadingThreads ? (
+          <div className="space-y-1.5">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-3 px-3.5 py-3 rounded-xl animate-pulse"
+              >
+                <div className="w-10 h-10 rounded-xl bg-purple-100 flex-shrink-0" />
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="h-3 w-2/3 rounded bg-purple-100" />
+                  <div className="h-2.5 w-4/5 rounded bg-purple-50" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-semibold truncate ${isSelected ? "text-purple-700" : "text-gray-700"}`}>
-                    {thread.name}
+              </div>
+            ))}
+          </div>
+        ) : (
+          threads.map((thread, index) => {
+            const isSelected = selectedThread === thread.id;
+            const icon = THREAD_ICONS[thread.id] || DEFAULT_ICON;
+
+            return (
+              <button
+                key={thread.id}
+                onClick={() => onSelectThread(thread.id)}
+                className={`w-full text-left px-3.5 py-3 rounded-xl transition-all duration-200 group ${
+                  isSelected
+                    ? "bg-white shadow-md shadow-purple-100 scale-[1.02]"
+                    : "hover:bg-white/60 hover:shadow-sm"
+                }`}
+                style={{
+                  animationDelay: `${index * 50}ms`,
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
+                      isSelected ? "shadow-sm" : ""
+                    }`}
+                    style={{
+                      background: isSelected
+                        ? "var(--own-gradient)"
+                        : "linear-gradient(135deg, #f3e8ff 0%, #ede9fe 100%)",
+                    }}
+                  >
+                    <svg
+                      className={`w-5 h-5 ${
+                        isSelected ? "text-white" : "text-purple-400"
+                      }`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d={icon}
+                      />
+                    </svg>
                   </div>
-                  {thread.last_message && (
-                    <div className="text-xs text-gray-400 mt-0.5 truncate">{stripHtml(thread.last_message)}</div>
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className={`text-sm font-semibold truncate ${
+                        isSelected ? "text-purple-700" : "text-gray-700"
+                      }`}
+                    >
+                      {thread.name}
+                    </div>
+                    {thread.last_message && (
+                      <div className="text-xs text-gray-400 mt-0.5 truncate">
+                        {stripHtml(thread.last_message)}
+                      </div>
+                    )}
+                  </div>
+                  {onDeleteThread && (
+                    <button
+                      onClick={(e) => handleDelete(e, thread.id)}
+                      className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                      title="Delete thread"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                  {isSelected && (
+                    <div
+                      className="w-1.5 h-8 rounded-full flex-shrink-0"
+                      style={{ background: "var(--own-gradient)" }}
+                    />
                   )}
                 </div>
-                {onDeleteThread && (
-                  <button
-                    onClick={(e) => handleDelete(e, thread.id)}
-                    className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-                    title="Delete thread"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                    </svg>
-                  </button>
-                )}
-                {isSelected && (
-                  <div className="w-1.5 h-8 rounded-full flex-shrink-0" style={{ background: "var(--own-gradient)" }} />
-                )}
-              </div>
-            </button>
-          );
-        })}
+              </button>
+            );
+          })
+        )}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { useChat } from "../hooks/useChat.ts";
 import type { ThreadModule, UserPayload } from "../types";
 
 const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "";
+const GENERAL_THREAD_NAME = "General";
 const PLACEHOLDER_IMG =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23a78bfa'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='16' font-weight='bold' font-family='system-ui'%3EU%3C/text%3E%3C/svg%3E";
 
@@ -20,7 +21,9 @@ function ChatContent() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [threads, setThreads] = useState<ThreadModule[]>([]);
+  const [isLoadingThreads, setIsLoadingThreads] = useState(true);
   const [isCreatingThread, setIsCreatingThread] = useState(false);
+  const [showThreadTypeSelector, setShowThreadTypeSelector] = useState(false);
   const [showCropSelector, setShowCropSelector] = useState(false);
   const [cropOptions, setCropOptions] = useState<
     Array<{
@@ -70,26 +73,29 @@ function ChatContent() {
   useEffect(() => {
     if (!userData?.token) return;
 
-    fetchConversations(userData.token).then((json) => {
-      if (json.success && json.data) {
-        const mapped: ThreadModule[] = json.data.map(
-          (c: {
-            id: number;
-            conv_name: string;
-            last_message?: string;
-            last_date_time?: number;
-            is_seen?: boolean;
-          }) => ({
-            id: c.id,
-            name: c.conv_name,
-            last_message: c.last_message,
-            last_date_time: c.last_date_time,
-            is_seen: c.is_seen,
-          }),
-        );
-        setThreads(mapped);
-      }
-    });
+    setIsLoadingThreads(true);
+    fetchConversations(userData.token)
+      .then((json) => {
+        if (json.success && json.data) {
+          const mapped: ThreadModule[] = json.data.map(
+            (c: {
+              id: number;
+              conv_name: string;
+              last_message?: string;
+              last_date_time?: number;
+              is_seen?: boolean;
+            }) => ({
+              id: c.id,
+              name: c.conv_name,
+              last_message: c.last_message,
+              last_date_time: c.last_date_time,
+              is_seen: c.is_seen,
+            }),
+          );
+          setThreads(mapped);
+        }
+      })
+      .finally(() => setIsLoadingThreads(false));
 
     if (!socket) return;
 
@@ -210,11 +216,82 @@ function ChatContent() {
   }, [userData?.token, userData?.farmer_id]);
 
   const openCreateThreadDialog = useCallback(() => {
+    setShowThreadTypeSelector(true);
+  }, []);
+
+  const openCropSelector = useCallback(() => {
+    setShowThreadTypeSelector(false);
     setSelectedCropId(null);
     setSelectedCropName("");
     setShowCropSelector(true);
     void loadCrops();
   }, [loadCrops]);
+
+  const handleCreateGeneralThread = useCallback(async () => {
+    if (!userData?.token || !userData?.farmer_id || isCreatingThread) return;
+
+    setShowThreadTypeSelector(false);
+
+    const existingThread = threads.find(
+      (thread) =>
+        thread.name?.trim().toLowerCase() ===
+        GENERAL_THREAD_NAME.toLowerCase(),
+    );
+
+    if (existingThread) {
+      if (selectedThread !== existingThread.id) {
+        setSelectedThread(existingThread.id);
+        joinThread(existingThread.id);
+      }
+      setSelectedCropName(GENERAL_THREAD_NAME);
+      setSidebarOpen(false);
+      return;
+    }
+
+    setIsCreatingThread(true);
+    try {
+      const json = await createAdvisory(
+        null,
+        userData.token,
+        Number(userData.farmer_id),
+        "general",
+      );
+
+      if (json.success && json.data?.id) {
+        await refreshThreads();
+        const targetThreadId = Number(json.data.id);
+        setSelectedThread(targetThreadId);
+        setSelectedCropName(GENERAL_THREAD_NAME);
+        joinThread(targetThreadId);
+        setSidebarOpen(false);
+        return;
+      }
+
+      await Swal.fire({
+        title: "Conversation not created",
+        text: "Something went wrong while creating the conversation.",
+        icon: "error",
+        confirmButtonColor: "#7c3aed",
+      });
+    } catch (error) {
+      console.log(error);
+      await Swal.fire({
+        title: "Conversation not created",
+        text: error instanceof Error ? error.message : "Please try again.",
+        icon: "error",
+        confirmButtonColor: "#7c3aed",
+      });
+    } finally {
+      setIsCreatingThread(false);
+    }
+  }, [
+    userData,
+    isCreatingThread,
+    threads,
+    selectedThread,
+    refreshThreads,
+    joinThread,
+  ]);
 
   const handleCreateThread = useCallback(async () => {
     if (!userData?.token || !userData?.farmer_id || isCreatingThread) return;
@@ -489,8 +566,50 @@ function ChatContent() {
           onCreateThread={openCreateThreadDialog}
           onDeleteThread={handleDeleteThread}
           isCreatingThread={isCreatingThread}
+          isLoadingThreads={isLoadingThreads}
         />
       </div>
+
+      {showThreadTypeSelector && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-purple-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800">
+                New Conversation
+              </h3>
+              <button
+                onClick={() => setShowThreadTypeSelector(false)}
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={openCropSelector}
+                className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 px-3 py-4 hover:border-purple-300 hover:bg-purple-50/50 transition text-gray-700"
+              >
+                <span className="text-2xl">🌾</span>
+                <span className="text-sm font-semibold">Crop</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateGeneralThread}
+                disabled={isCreatingThread}
+                className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 px-3 py-4 hover:border-purple-300 hover:bg-purple-50/50 transition text-gray-700 disabled:opacity-60"
+              >
+                <span className="text-2xl">💬</span>
+                <span className="text-sm font-semibold">
+                  {isCreatingThread ? "Creating..." : "General"}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showCropSelector && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
@@ -577,6 +696,7 @@ function ChatContent() {
             onCreateThread={openCreateThreadDialog}
             onDeleteThread={handleDeleteThread}
             isCreatingThread={isCreatingThread}
+          isLoadingThreads={isLoadingThreads}
           />
         </div>
 
