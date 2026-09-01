@@ -38,6 +38,7 @@ export interface SendMessagePayload {
   thread_module_id: number;
   message: string;
   farmer_id?: string;
+  crop_name?: string;
   user_id?: number;
   sender_type?: LoginType | "ai_agent";
   client_id?: string;

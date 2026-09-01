@@ -23,7 +23,15 @@ function ChatContent() {
   const [isCreatingThread, setIsCreatingThread] = useState(false);
   const [showCropSelector, setShowCropSelector] = useState(false);
   const [cropOptions, setCropOptions] = useState<
-    Array<{ id: number; name: string }>
+    Array<{
+      id: number;
+      name: string;
+      crop_bangla_name?: string;
+      bangla_name?: string;
+      cropBanglaName?: string;
+      banglaName?: string;
+      crop_name_bn?: string;
+    }>
   >([]);
   const [selectedCropId, setSelectedCropId] = useState<number | null>(null);
   const [selectedCropName, setSelectedCropName] = useState<string>("");
@@ -122,11 +130,13 @@ function ChatContent() {
       if (selectedThread !== null) {
         leaveThread(selectedThread);
       }
+      const thread = threads.find((item) => item.id === threadId);
+      setSelectedCropName(thread?.name ?? "");
       setSelectedThread(threadId);
       joinThread(threadId);
       setSidebarOpen(false);
     },
-    [selectedThread, joinThread, leaveThread],
+    [selectedThread, joinThread, leaveThread, threads],
   );
 
   const refreshThreads = useCallback(async () => {
@@ -167,10 +177,26 @@ function ChatContent() {
             : [];
 
       const normalized = rawCrops
-        .map((crop: Record<string, unknown>) => ({
-          id: Number(crop.id ?? crop.crop_id ?? crop.cropId),
-          name: String(crop.name ?? crop.crop_name ?? crop.cropName ?? "Crop"),
-        }))
+        .map((crop: Record<string, unknown>) => {
+          const banglaName = [
+            crop.crop_bangla_name,
+            crop.bangla_name,
+            crop.cropBanglaName,
+            crop.banglaName,
+            crop.crop_name_bn,
+          ].find(
+            (value): value is string =>
+              typeof value === "string" && value.trim().length > 0,
+          );
+
+          return {
+            id: Number(crop.id ?? crop.crop_id ?? crop.cropId),
+            name: String(
+              crop.name ?? crop.crop_name ?? crop.cropName ?? "Crop",
+            ),
+            crop_bangla_name: banglaName,
+          };
+        })
         .filter((crop: { id: number; name: string }) =>
           Number.isFinite(crop.id),
         );
@@ -183,11 +209,11 @@ function ChatContent() {
     }
   }, [userData?.token, userData?.farmer_id]);
 
-  const openCreateThreadDialog = useCallback(async () => {
+  const openCreateThreadDialog = useCallback(() => {
     setSelectedCropId(null);
     setSelectedCropName("");
-    await loadCrops();
     setShowCropSelector(true);
+    void loadCrops();
   }, [loadCrops]);
 
   const handleCreateThread = useCallback(async () => {
@@ -275,17 +301,37 @@ function ChatContent() {
     [deleteThread],
   );
 
+  const selectedThreadName =
+    threads.find((t) => t.id === selectedThread)?.name || "";
+  const removeEnglishCropName = (cropName: string = ""): string => {
+    const cleanedCropName = cropName.replace(/\s*\([^)]*\)\s*$/, "").trim();
+
+    const hasBangla = /[\u0980-\u09FF]/.test(cleanedCropName);
+
+    return hasBangla ? cleanedCropName : "";
+  };
   const handleSendMessage = useCallback(
-    (message: string) => {
+    (message: string, cropName?: string) => {
       if (!userData) return;
+
+      const resolvedCropName =
+        cropName?.trim() ||
+        selectedCropName.trim() ||
+        selectedThreadName.trim() ||
+        undefined;
+      const cropNameWithoutEnglish = removeEnglishCropName(
+        resolvedCropName || "",
+      );
+
       chat.sendMessage({
         message,
         user_id: userData.user_id,
         farmer_id: userData.farmer_id,
         sender_type: userData.login_type,
+        crop_name: cropNameWithoutEnglish,
       });
     },
-    [chat, userData],
+    [chat, userData, selectedCropName, selectedThreadName],
   );
 
   const handleTypingStart = useCallback(() => {
@@ -303,9 +349,6 @@ function ChatContent() {
   }, [chat, userData]);
 
   if (!userData) return null;
-
-  const selectedThreadName =
-    threads.find((t) => t.id === selectedThread)?.name || "";
 
   return (
     <div className="h-dvh flex flex-col bg-gray-50">
@@ -453,7 +496,7 @@ function ChatContent() {
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl border border-purple-100">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-800">Select crop</h3>
+              <h3 className="text-lg font-bold text-gray-800">Select Crop</h3>
               <button
                 onClick={() => setShowCropSelector(false)}
                 className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
@@ -464,8 +507,9 @@ function ChatContent() {
             </div>
 
             {isLoadingCrops ? (
-              <div className="flex items-center justify-center py-8 text-sm text-gray-500">
-                Loading crops...
+              <div className="flex flex-col items-center justify-center gap-3 py-8 text-sm text-gray-500">
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-purple-200 border-t-purple-600" />
+                <span>Loading crops...</span>
               </div>
             ) : cropOptions.length === 0 ? (
               <div className="py-6 text-center text-sm text-gray-500">
@@ -479,7 +523,9 @@ function ChatContent() {
                     type="button"
                     onClick={() => {
                       setSelectedCropId(crop.id);
-                      setSelectedCropName(crop.name);
+                      setSelectedCropName(
+                        crop.crop_bangla_name ?? crop.name ?? "",
+                      );
                     }}
                     className={`w-full text-left rounded-xl border px-3 py-2.5 transition ${
                       selectedCropId === crop.id
@@ -562,6 +608,7 @@ function ChatContent() {
                 onTypingStop={handleTypingStop}
                 disabled={chat.isSending}
                 isSending={chat.isSending}
+                cropName={selectedCropName}
               />
             </>
           ) : (
