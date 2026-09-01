@@ -123,6 +123,10 @@ export function useChat(
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState<string>("");
   const [thinkingText, setThinkingText] = useState<string>("");
+  // True from the moment a message is sent until the first stream event
+  // (thinking/token/done/...) comes back, so the UI has something to show
+  // during that initial gap instead of going blank.
+  const [isAwaitingResponse, setIsAwaitingResponse] = useState(false);
   const [hasMorePages, setHasMorePages] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(false);
@@ -212,6 +216,7 @@ export function useChat(
     let ignore = false;
     setMessages([]);
     setThinkingText("");
+    setIsAwaitingResponse(false);
     setIsLoadingInitial(true);
 
     if (token) {
@@ -302,6 +307,10 @@ export function useChat(
     if (subscribeMessageStream) {
       const handleStream = (data: MessageStreamPayload) => {
         if (data.thread_module_id !== threadModuleId) return;
+
+        // Any stream event at all means the server has started responding
+        // — stop showing the plain "waiting for a response" skeleton.
+        setIsAwaitingResponse(false);
 
         const messageId = String(
           data.stream_data?.message_id ??
@@ -717,6 +726,10 @@ export function useChat(
       };
 
       setIsSending(true);
+      // The skeleton shows from the moment the message is sent until the
+      // first stream event arrives (cleared in handleStream above), or is
+      // cancelled here if the send itself never even got acknowledged.
+      setIsAwaitingResponse(true);
       socket.emit(
         "message:send",
         fullPayload,
@@ -727,6 +740,7 @@ export function useChat(
         }) => {
           setIsSending(false);
           if (!response.success) {
+            setIsAwaitingResponse(false);
           }
         }
       );
@@ -769,6 +783,7 @@ export function useChat(
     isTyping,
     typingUser,
     thinkingText,
+    isAwaitingResponse,
     hasMorePages,
     isLoadingMore,
     isLoadingInitial,

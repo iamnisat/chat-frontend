@@ -10,6 +10,7 @@ interface ChatWindowProps {
   isTyping: boolean;
   typingUser: string;
   thinkingText?: string;
+  isAwaitingResponse?: boolean;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   hasMorePages: boolean;
   isLoadingMore: boolean;
@@ -24,6 +25,7 @@ export function ChatWindow({
   isTyping,
   typingUser,
   thinkingText,
+  isAwaitingResponse,
   messagesEndRef,
   hasMorePages,
   isLoadingMore,
@@ -71,11 +73,12 @@ export function ChatWindow({
   }, [messages, messagesEndRef]);
 
   useEffect(() => {
-    if (!isTyping || !hasInitiallyLoaded.current) return;
+    if ((!isTyping && !isAwaitingResponse) || !hasInitiallyLoaded.current)
+      return;
     requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     });
-  }, [isTyping, messagesEndRef]);
+  }, [isTyping, isAwaitingResponse, messagesEndRef]);
 
   return (
     <div
@@ -185,7 +188,7 @@ export function ChatWindow({
                 }
               />
             ))}
-          {isTyping &&
+          {(isTyping || isAwaitingResponse) &&
             (thinkingText?.trim() || !messages.some((m) => m.streaming)) && (
               <TypingIndicator
                 userName={typingUser}

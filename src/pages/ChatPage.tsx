@@ -714,6 +714,7 @@ function ChatContent() {
                   isTyping={chat.isTyping}
                   typingUser={chat.typingUser}
                   thinkingText={chat.thinkingText}
+                  isAwaitingResponse={chat.isAwaitingResponse}
                   messagesEndRef={chat.messagesEndRef}
                   hasMorePages={chat.hasMorePages}
                   isLoadingMore={chat.isLoadingMore}

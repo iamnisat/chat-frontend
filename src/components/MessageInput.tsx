@@ -185,12 +185,17 @@ export function MessageInput({
     }
   };
 
+  // How tall the box is allowed to grow before it starts scrolling
+  // internally instead of pushing more content out — generous enough that
+  // a long message keeps visibly expanding rather than clamping early.
+  const MAX_TEXTAREA_HEIGHT = 320;
+
   const handleInput = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${Math.min(
         textareaRef.current.scrollHeight,
-        120
+        MAX_TEXTAREA_HEIGHT
       )}px`;
     }
   };
@@ -211,7 +216,7 @@ export function MessageInput({
             onInput={handleInput}
             placeholder="Type a message..."
             disabled={disabled}
-            className="flex-1 resize-none bg-transparent px-4 py-3 text-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400"
+            className="flex-1 resize-none overflow-y-auto bg-transparent px-4 py-3 text-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400"
             rows={1}
             maxLength={MAX_CHARS + 100}
           />
