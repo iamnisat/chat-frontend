@@ -16,6 +16,11 @@ interface MessageInputProps {
 
 const MAX_CHARS = 5000;
 
+// How tall the message box is allowed to grow before it starts scrolling
+// internally instead of pushing more content out — generous enough that a
+// long message keeps visibly expanding rather than clamping early.
+const MAX_TEXTAREA_HEIGHT = 320;
+
 const LANGUAGE_OPTIONS: { value: LanguageType; label: string }[] = [
   { value: "bn", label: "বাংলা" },
   { value: "en", label: "English" },
@@ -186,161 +191,92 @@ export function MessageInput({
         setIsTyping(false);
         onTypingStop();
       }
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-      }
     }
   };
 
-  // How tall the box is allowed to grow before it starts scrolling
-  // internally instead of pushing more content out — generous enough that
-  // a long message keeps visibly expanding rather than clamping early.
-  const MAX_TEXTAREA_HEIGHT = 320;
-
-  const handleInput = () => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(
-        textareaRef.current.scrollHeight,
-        MAX_TEXTAREA_HEIGHT
-      )}px`;
-    }
-  };
+  // Auto-grow the textarea whenever the message text itself changes —
+  // keyed on state rather than the textarea's DOM `input` event, since
+  // dictation (speech-to-text) sets the text via setMessage/React state
+  // and never fires a real `input` event, which used to leave the box
+  // stuck at one line no matter how much you dictated.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
+  }, [message]);
 
   const charCount = message.length;
   const isOverLimit = charCount > MAX_CHARS;
   const hasText = message.trim().length > 0;
 
   return (
-    <div className="border-t border-purple-100 bg-white px-4 py-3 flex-shrink-0">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-end gap-2 bg-gray-50 rounded-2xl border border-gray-200 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-100 transition-all">
-          <textarea
-            ref={textareaRef}
-            value={message}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            onInput={handleInput}
-            placeholder="Type a message..."
-            disabled={disabled}
-            className="flex-1 resize-none overflow-y-auto bg-transparent px-4 py-3 text-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400"
-            rows={1}
-            maxLength={MAX_CHARS + 100}
-          />
-          <div className="relative m-1.5 flex-shrink-0">
-            <div
-              className="pointer-events-none flex items-center gap-1 px-2.5 py-2.5 rounded-xl text-gray-400"
-              aria-hidden="true"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"
-                />
-              </svg>
-              <span className="text-xs font-bold text-purple-500">
-                {language.toUpperCase()}
-              </span>
-            </div>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as LanguageType)}
-              disabled={disabled}
-              aria-label="Reply language"
-              title="Reply language"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-            >
-              {LANGUAGE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {speechSupported && (
-            <button
-              type="button"
-              onClick={toggleListening}
-              disabled={disabled}
-              className={`m-1.5 p-2.5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
-                isListening
-                  ? "text-white shadow-md animate-thinking-glow"
-                  : "text-gray-400 hover:text-purple-500 hover:bg-purple-50"
-              }`}
-              style={
-                isListening ? { background: "var(--own-gradient)" } : undefined
-              }
-              aria-pressed={isListening}
-              aria-label={
-                isListening
-                  ? "Stop voice input"
-                  : `Speak in ${
-                      LANGUAGE_OPTIONS.find((o) => o.value === language)
-                        ?.label ?? "selected language"
-                    }`
-              }
-              title={isListening ? "Stop voice input" : "Voice input"}
-            >
-              {isListening ? (
-                <svg
-                  className="w-5 h-5"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
-                </svg>
-              ) : (
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
-                  />
-                </svg>
-              )}
-            </button>
-          )}
-          <button
-            onClick={handleSend}
-            disabled={disabled || isSending || !hasText || isOverLimit}
-            className={`m-1.5 p-2.5 rounded-xl transition-all duration-200 ${
-              hasText && !isOverLimit && !isSending
-                ? "text-white shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
-            }`}
-            style={
-              hasText && !isOverLimit && !isSending
-                ? { background: "var(--own-gradient)" }
-                : undefined
-            }
-            aria-label={isSending ? "Sending message" : "Send message"}
+    <div className="border-t border-purple-100 bg-white px-3 sm:px-4 py-3 flex-shrink-0 safe-bottom">
+      <div className="max-w-3xl mx-auto flex items-end gap-1.5 sm:gap-2">
+        {/* Language: standalone circular button, badge shows the current code */}
+        <div className="relative flex-shrink-0">
+          <div
+            className="pointer-events-none flex items-center justify-center w-11 h-11 rounded-full text-white shadow-sm"
+            style={{ background: "var(--own-gradient)" }}
+            aria-hidden="true"
           >
-            {isSending ? (
-              <svg
-                className="w-5 h-5 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 3v3m0 12v3m9-9h-3M6 12H3m14.95 7.05-2.12-2.12M9.17 9.17 6.05 6.05m11.9 0-2.12 2.12M9.17 14.83l-3.12 3.12"
-                />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"
+              />
+            </svg>
+          </div>
+          <span className="pointer-events-none absolute -top-1 -right-1 text-[9px] font-bold text-purple-600 bg-white border border-purple-200 rounded-full px-1 py-px leading-tight shadow-sm">
+            {language.toUpperCase()}
+          </span>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as LanguageType)}
+            disabled={disabled}
+            aria-label="Reply language"
+            title="Reply language"
+            className="absolute inset-0 w-11 h-11 rounded-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+          >
+            {LANGUAGE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Voice input: standalone circular button */}
+        {speechSupported && (
+          <button
+            type="button"
+            onClick={toggleListening}
+            disabled={disabled}
+            className={`flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-full text-white shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+              isListening ? "animate-thinking-glow" : "hover:opacity-90"
+            }`}
+            style={{ background: "var(--own-gradient)" }}
+            aria-pressed={isListening}
+            aria-label={
+              isListening
+                ? "Stop voice input"
+                : `Speak in ${
+                    LANGUAGE_OPTIONS.find((o) => o.value === language)
+                      ?.label ?? "selected language"
+                  }`
+            }
+            title={isListening ? "Stop voice input" : "Voice input"}
+          >
+            {isListening ? (
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
               </svg>
             ) : (
               <svg
@@ -353,25 +289,87 @@ export function MessageInput({
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"
+                  d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
                 />
               </svg>
             )}
           </button>
+        )}
+
+        {/* Text box: its own standalone pill, no longer sharing a border with the buttons */}
+        <div className="min-w-0 flex-1 flex items-center bg-gray-50 rounded-3xl border border-gray-200 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-100 transition-all">
+          <textarea
+            ref={textareaRef}
+            value={message}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Message..."
+            disabled={disabled}
+            className="w-full resize-none overflow-y-auto bg-transparent px-4 py-2.5 text-base sm:text-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400"
+            rows={1}
+            maxLength={MAX_CHARS + 100}
+          />
         </div>
-        <div className="mt-1.5 flex justify-end px-1">
-          <span
-            className={`text-[10px] font-medium transition-colors ${
-              isOverLimit
-                ? "text-rose-500"
-                : charCount > MAX_CHARS * 0.9
-                ? "text-amber-500"
-                : "text-gray-300"
-            }`}
-          >
-            {charCount > 0 ? `${charCount}/${MAX_CHARS}` : ""}
-          </span>
-        </div>
+
+        {/* Send: standalone circular button */}
+        <button
+          onClick={handleSend}
+          disabled={disabled || isSending || !hasText || isOverLimit}
+          className={`flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-full transition-all duration-200 ${
+            hasText && !isOverLimit && !isSending
+              ? "text-white shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+          }`}
+          style={
+            hasText && !isOverLimit && !isSending
+              ? { background: "var(--own-gradient)" }
+              : undefined
+          }
+          aria-label={isSending ? "Sending message" : "Send message"}
+        >
+          {isSending ? (
+            <svg
+              className="w-5 h-5 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 3v3m0 12v3m9-9h-3M6 12H3m14.95 7.05-2.12-2.12M9.17 9.17 6.05 6.05m11.9 0-2.12 2.12M9.17 14.83l-3.12 3.12"
+              />
+            </svg>
+          ) : (
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"
+              />
+            </svg>
+          )}
+        </button>
+      </div>
+      <div className="max-w-3xl mx-auto mt-1.5 flex justify-end px-1">
+        <span
+          className={`text-[10px] font-medium transition-colors ${
+            isOverLimit
+              ? "text-rose-500"
+              : charCount > MAX_CHARS * 0.9
+              ? "text-amber-500"
+              : "text-gray-300"
+          }`}
+        >
+          {charCount > 0 ? `${charCount}/${MAX_CHARS}` : ""}
+        </span>
       </div>
     </div>
   );

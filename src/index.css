@@ -31,6 +31,38 @@ body,
   -webkit-font-smoothing: antialiased;
 }
 
+/* Safety net: nothing in the app should ever cause horizontal scroll on
+   any viewport width — a stray fixed width or long unbroken string
+   shouldn't be able to push the page sideways. */
+html,
+body {
+  overflow-x: hidden;
+}
+
+/* Respect notches / home indicators / rounded corners (iOS "safe area")
+   when the viewport meta opts in via viewport-fit=cover. Zero on devices
+   without one. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+.safe-top {
+  padding-top: max(env(safe-area-inset-top, 0px), 0px);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-x {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 5px;
@@ -240,6 +272,12 @@ body,
 }
 
 /* Message content styles */
+.ai-message-content {
+  /* A long unbroken string (URL, id, etc.) shouldn't be able to widen the
+     bubble past the viewport on narrow screens. */
+  overflow-wrap: anywhere;
+}
+
 .ai-message-content p {
   margin-bottom: 0.5rem;
   line-height: 1.6;

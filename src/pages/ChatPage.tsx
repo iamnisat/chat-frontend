@@ -426,9 +426,9 @@ function ChatContent() {
   if (!userData) return null;
 
   return (
-    <div className="h-dvh flex flex-col bg-gray-50">
+    <div className="h-dvh flex flex-col bg-gray-50 safe-x">
       {/* Header */}
-      <header className="bg-white border-b border-purple-100 flex-shrink-0 z-30">
+      <header className="bg-white border-b border-purple-100 flex-shrink-0 z-30 safe-top">
         <div className="px-4 py-3 flex items-center justify-between">
           {/* Left: User info */}
           <div className="flex items-center gap-3 min-w-0">
@@ -533,7 +533,7 @@ function ChatContent() {
 
       {/* Mobile sidebar */}
       <div
-        className={`thread-sidebar md:hidden ${sidebarOpen ? "open" : ""}`}
+        className={`thread-sidebar md:hidden safe-top safe-bottom ${sidebarOpen ? "open" : ""}`}
         style={{ background: "var(--surface)" }}
       >
         <div className="flex items-center justify-between p-4 border-b border-purple-100">
