@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { LanguageType } from "../types";
 
 interface MessageInputProps {
@@ -114,7 +114,8 @@ export function MessageInput({
         baseMessageRef.current = `${baseMessageRef.current}${finalTranscript} `;
       }
 
-      const combined = `${baseMessageRef.current}${interimTranscript}`.trimStart();
+      const combined =
+        `${baseMessageRef.current}${interimTranscript}`.trimStart();
       if (combined.length <= MAX_CHARS) {
         setMessage(combined);
         handleTyping();
@@ -187,7 +188,10 @@ export function MessageInput({
   const handleInput = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+      textareaRef.current.style.height = `${Math.min(
+        textareaRef.current.scrollHeight,
+        120
+      )}px`;
     }
   };
 
@@ -198,21 +202,6 @@ export function MessageInput({
   return (
     <div className="border-t border-purple-100 bg-white px-4 py-3 flex-shrink-0">
       <div className="max-w-3xl mx-auto">
-        <div className="mb-1.5 flex justify-end">
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as LanguageType)}
-            disabled={disabled}
-            aria-label="Reply language"
-            className="text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-100 focus:border-purple-300 disabled:opacity-50"
-          >
-            {LANGUAGE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
         <div className="flex items-end gap-2 bg-gray-50 rounded-2xl border border-gray-200 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-100 transition-all">
           <textarea
             ref={textareaRef}
@@ -226,6 +215,43 @@ export function MessageInput({
             rows={1}
             maxLength={MAX_CHARS + 100}
           />
+          <div className="relative m-1.5 flex-shrink-0">
+            <div
+              className="pointer-events-none flex items-center gap-1 px-2.5 py-2.5 rounded-xl text-gray-400"
+              aria-hidden="true"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"
+                />
+              </svg>
+              <span className="text-xs font-bold text-purple-500">
+                {language.toUpperCase()}
+              </span>
+            </div>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as LanguageType)}
+              disabled={disabled}
+              aria-label="Reply language"
+              title="Reply language"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+            >
+              {LANGUAGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
           {speechSupported && (
             <button
               type="button"
@@ -236,21 +262,36 @@ export function MessageInput({
                   ? "text-white shadow-md animate-thinking-glow"
                   : "text-gray-400 hover:text-purple-500 hover:bg-purple-50"
               }`}
-              style={isListening ? { background: "var(--own-gradient)" } : undefined}
+              style={
+                isListening ? { background: "var(--own-gradient)" } : undefined
+              }
               aria-pressed={isListening}
               aria-label={
                 isListening
                   ? "Stop voice input"
-                  : `Speak in ${LANGUAGE_OPTIONS.find((o) => o.value === language)?.label ?? "selected language"}`
+                  : `Speak in ${
+                      LANGUAGE_OPTIONS.find((o) => o.value === language)
+                        ?.label ?? "selected language"
+                    }`
               }
               title={isListening ? "Stop voice input" : "Voice input"}
             >
               {isListening ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <rect x="6" y="6" width="12" height="12" rx="2" />
                 </svg>
               ) : (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -312,8 +353,8 @@ export function MessageInput({
               isOverLimit
                 ? "text-rose-500"
                 : charCount > MAX_CHARS * 0.9
-                  ? "text-amber-500"
-                  : "text-gray-300"
+                ? "text-amber-500"
+                : "text-gray-300"
             }`}
           >
             {charCount > 0 ? `${charCount}/${MAX_CHARS}` : ""}
