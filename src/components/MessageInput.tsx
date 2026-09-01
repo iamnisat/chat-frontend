@@ -153,6 +153,13 @@ export function MessageInput({
     const value = e.target.value;
     if (value.length <= MAX_CHARS) {
       setMessage(value);
+      // This only fires on a real user edit (setMessage from dictation
+      // doesn't trigger the textarea's onChange). Keep the dictation base
+      // in sync so that if the user corrects the text by hand — e.g.
+      // deleting a misheard word — while still listening, the next thing
+      // they say is appended onto what's actually in the box now, not
+      // onto the stale text from when dictation started.
+      baseMessageRef.current = value;
       handleTyping();
     }
   };

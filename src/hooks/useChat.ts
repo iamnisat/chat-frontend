@@ -375,9 +375,11 @@ export function useChat(
           const thinkingContent =
             knownContent || (stream ? `[debug] ${JSON.stringify(stream)}` : "");
           setThinkingText(thinkingContent);
-        } else if (eventType || streamStatus) {
-          // Any non-thinking event means the actual answer has started
-          // streaming (or the turn is done) — drop the thinking preview.
+        } else if (eventType === "token" || eventType === "content" || isDone) {
+          // Only clear the thinking preview once the real answer text has
+          // actually started streaming, or the turn is done — a bare
+          // "status" ping in between (progress/heartbeat, no real content)
+          // shouldn't wipe it and flash the generic skeleton fallback.
           setThinkingText("");
         }
 
