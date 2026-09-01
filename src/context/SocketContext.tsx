@@ -355,7 +355,7 @@ export function SocketProvider({
         return;
       }
 
-      newSocket.emit("user:join", payload, (response: SocketResponse) => {});
+      newSocket.emit("user:join", payload, (_response: SocketResponse) => {});
     };
 
     const rejoinThreads = () => {
@@ -370,7 +370,7 @@ export function SocketProvider({
           {
             thread_module_id: threadModuleId,
           },
-          (response: SocketResponse) => {}
+          (_response: SocketResponse) => {}
         );
       });
     };
@@ -392,17 +392,17 @@ export function SocketProvider({
       }
     });
 
-    newSocket.on("connect_error", (error) => {
+    newSocket.on("connect_error", () => {
       setIsConnected(false);
     });
 
-    newSocket.io.on("reconnect_attempt", (attempt) => {
+    newSocket.io.on("reconnect_attempt", () => {
       setIsReconnecting(true);
 
       setIsConnected(false);
     });
 
-    newSocket.io.on("reconnect", (attempt) => {
+    newSocket.io.on("reconnect", () => {
       setIsConnected(true);
 
       setIsReconnecting(false);
@@ -410,7 +410,7 @@ export function SocketProvider({
       setSocketId(newSocket.id ?? null);
     });
 
-    newSocket.io.on("reconnect_error", (error) => {});
+    newSocket.io.on("reconnect_error", () => {});
 
     newSocket.io.on("reconnect_failed", () => {
       setIsReconnecting(false);
