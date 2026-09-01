@@ -28,7 +28,6 @@ export function ChatWindow({
   isLoadingInitial,
   onLoadMore,
 }: ChatWindowProps) {
-  console.log("🚀 ~ ChatWindow ~ messages:", messages);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasInitiallyLoaded = useRef(false);
   const lastMessageIdRef = useRef<string | number | null>(null);
@@ -50,7 +49,7 @@ export function ChatWindow({
     }
 
     const newestMessage = messages.reduce((latest, msg) =>
-      msg.created_at.localeCompare(latest.created_at) > 0 ? msg : latest,
+      msg.created_at.localeCompare(latest.created_at) > 0 ? msg : latest
     );
 
     if (!hasInitiallyLoaded.current) {

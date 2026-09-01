@@ -29,10 +29,10 @@
 //   userPayloadRef.current = userPayload;
 
 //   useEffect(() => {
-//     console.log("[Socket] Connecting to:", SOCKET_URL);
+//
 
 //     const IS_DEV = import.meta.env.VITE_APP_ENV !== "production";
-//     console.log("[Socket] Connecting to:", SOCKET_URL, "| transport:", IS_DEV ? "polling" : "websocket+polling");
+//
 
 //     const newSocket = io(SOCKET_URL, {
 //       path: "/socket.io",
@@ -47,7 +47,7 @@
 //     setSocket(newSocket);
 
 //     newSocket.on("connect", () => {
-//       console.log("[Socket] Connected, id:", newSocket.id);
+//
 //       setIsConnected(true);
 //       setIsReconnecting(false);
 //       setSocketId(newSocket.id || null);
@@ -55,25 +55,25 @@
 //       const payload = userPayloadRef.current;
 //       if (payload) {
 //         newSocket.emit("user:join", payload, (response: { success: boolean; message?: string }) => {
-//           console.log("[Socket] user:join response:", response);
+//
 //         });
 //       }
 //     });
 
 //     newSocket.on("disconnect", (reason) => {
-//       console.log("[Socket] Disconnected:", reason);
+//
 //       setIsConnected(false);
 //       setSocketId(null);
 //     });
 
 //     newSocket.on("reconnect_attempt", (attempt) => {
-//       console.log("[Socket] Reconnect attempt:", attempt);
+//
 //       setIsReconnecting(true);
 //       setIsConnected(false);
 //     });
 
 //     newSocket.on("reconnect", (attempt) => {
-//       console.log("[Socket] Reconnected after", attempt, "attempts");
+//
 //       setIsConnected(true);
 //       setIsReconnecting(false);
 //       setSocketId(newSocket.id || null);
@@ -85,17 +85,17 @@
 //     });
 
 //     newSocket.on("reconnect_failed", () => {
-//       console.log("[Socket] Reconnect failed");
+//
 //       setIsReconnecting(false);
 //       setIsConnected(false);
 //     });
 
 //     newSocket.on("connect_error", (err) => {
-//       console.error("[Socket] Connection error:", err.message);
+//
 //     });
 
 //     return () => {
-//       console.log("[Socket] Cleaning up");
+//
 //       newSocket.disconnect();
 //       socketRef.current = null;
 //     };
@@ -199,7 +199,7 @@ import {
 
 import { io, type Socket } from "socket.io-client";
 
-import type { UserPayload, ThreadModule } from "../types";
+import type { ThreadModule, UserPayload } from "../types";
 export interface RagStreamEvent {
   type?: string | null;
   status?: string | null;
@@ -286,15 +286,15 @@ interface SocketContextType {
   listThreads: () => Promise<ThreadListResponse>;
 
   subscribeMessageStream: (
-    callback: (data: MessageStreamPayload) => void,
+    callback: (data: MessageStreamPayload) => void
   ) => () => void;
 
   subscribeNewMessage: (
-    callback: (data: NewMessagePayload) => void,
+    callback: (data: NewMessagePayload) => void
   ) => () => void;
 
   subscribeConversationNewMessage: (
-    callback: (data: ConversationNewMessagePayload) => void,
+    callback: (data: ConversationNewMessagePayload) => void
   ) => () => void;
 }
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -321,8 +321,6 @@ export function SocketProvider({
     userPayloadRef.current = userPayload;
   }, [userPayload]);
   useEffect(() => {
-    console.log("[Socket] Connecting to:", SOCKET_URL);
-
     const newSocket = io(SOCKET_URL, {
       path: "/socket.io",
       transports: ["websocket", "polling"],
@@ -357,11 +355,7 @@ export function SocketProvider({
         return;
       }
 
-      console.log("[Socket] Rejoining user...");
-
-      newSocket.emit("user:join", payload, (response: SocketResponse) => {
-        console.log("[Socket] user:join response:", response);
-      });
+      newSocket.emit("user:join", payload, (response: SocketResponse) => {});
     };
 
     const rejoinThreads = () => {
@@ -376,9 +370,7 @@ export function SocketProvider({
           {
             thread_module_id: threadModuleId,
           },
-          (response: SocketResponse) => {
-            console.log(`[Socket] Rejoin thread ${threadModuleId}:`, response);
-          },
+          (response: SocketResponse) => {}
         );
       });
     };
@@ -392,8 +384,6 @@ export function SocketProvider({
     });
 
     newSocket.on("disconnect", (reason) => {
-      console.log("[Socket] Disconnected:", reason);
-
       setIsConnected(false);
 
       setSocketId(null);
@@ -403,22 +393,16 @@ export function SocketProvider({
     });
 
     newSocket.on("connect_error", (error) => {
-      console.error("[Socket] Connection error:", error.message);
-
       setIsConnected(false);
     });
 
     newSocket.io.on("reconnect_attempt", (attempt) => {
-      console.log("[Socket] Reconnect attempt:", attempt);
-
       setIsReconnecting(true);
 
       setIsConnected(false);
     });
 
     newSocket.io.on("reconnect", (attempt) => {
-      console.log("[Socket] Reconnected after", attempt, "attempt(s)");
-
       setIsConnected(true);
 
       setIsReconnecting(false);
@@ -426,21 +410,15 @@ export function SocketProvider({
       setSocketId(newSocket.id ?? null);
     });
 
-    newSocket.io.on("reconnect_error", (error) => {
-      console.error("[Socket] Reconnect error:", error.message);
-    });
+    newSocket.io.on("reconnect_error", (error) => {});
 
     newSocket.io.on("reconnect_failed", () => {
-      console.error("[Socket] Reconnect failed");
-
       setIsReconnecting(false);
 
       setIsConnected(false);
     });
 
     return () => {
-      console.log("[Socket] Cleaning up");
-
       newSocket.removeAllListeners();
 
       newSocket.io.removeAllListeners();
@@ -464,8 +442,6 @@ export function SocketProvider({
       const currentSocket = socketRef.current;
 
       if (!currentSocket || !currentSocket.connected) {
-        console.warn("[Socket] Cannot join user. Socket not connected.");
-
         resolve(false);
 
         return;
@@ -473,8 +449,6 @@ export function SocketProvider({
       userPayloadRef.current = payload;
 
       currentSocket.emit("user:join", payload, (response: SocketResponse) => {
-        console.log("[Socket] user:join:", response);
-
         resolve(response?.success ?? false);
       });
     });
@@ -484,14 +458,10 @@ export function SocketProvider({
       const currentSocket = socketRef.current;
 
       if (!currentSocket || !currentSocket.connected) {
-        console.warn("[Socket] Cannot join thread. Socket not connected.");
-
         resolve(false);
 
         return;
       }
-
-      console.log("[Socket] Joining thread:", threadModuleId);
 
       currentSocket.emit(
         "thread:join",
@@ -499,14 +469,12 @@ export function SocketProvider({
           thread_module_id: threadModuleId,
         },
         (response: SocketResponse) => {
-          console.log(`[Socket] thread:join ${threadModuleId}:`, response);
-
           if (response?.success) {
             joinedThreadsRef.current.add(threadModuleId);
           }
 
           resolve(response?.success ?? false);
-        },
+        }
       );
     });
   }, []);
@@ -519,13 +487,10 @@ export function SocketProvider({
         joinedThreadsRef.current.delete(threadModuleId);
 
         if (!currentSocket || !currentSocket.connected) {
-          console.warn("[Socket] Socket disconnected while leaving thread.");
           resolve(true);
 
           return;
         }
-
-        console.log("[Socket] Leaving thread:", threadModuleId);
 
         currentSocket.emit(
           "thread:leave",
@@ -533,14 +498,12 @@ export function SocketProvider({
             thread_module_id: threadModuleId,
           },
           (response: SocketResponse) => {
-            console.log(`[Socket] thread:leave ${threadModuleId}:`, response);
-
             resolve(response?.success ?? false);
-          },
+          }
         );
       });
     },
-    [],
+    []
   );
 
   const createThread = useCallback(
@@ -564,11 +527,11 @@ export function SocketProvider({
           },
           (response: ThreadCreateResponse) => {
             resolve(response);
-          },
+          }
         );
       });
     },
-    [],
+    []
   );
 
   const deleteThread = useCallback(
@@ -594,11 +557,11 @@ export function SocketProvider({
           },
           (response: SocketResponse) => {
             resolve(response);
-          },
+          }
         );
       });
     },
-    [],
+    []
   );
 
   const listThreads = useCallback((): Promise<ThreadListResponse> => {
@@ -626,23 +589,19 @@ export function SocketProvider({
 
       if (!currentSocket) {
         console.warn(
-          "[Socket] Cannot subscribe message:stream. Socket unavailable.",
+          "[Socket] Cannot subscribe message:stream. Socket unavailable."
         );
 
         return () => {};
       }
 
-      console.log("[Socket] Subscribe: message:stream");
-
       currentSocket.on("message:stream", callback);
 
       return () => {
-        console.log("[Socket] Unsubscribe: message:stream");
-
         currentSocket.off("message:stream", callback);
       };
     },
-    [],
+    []
   );
   const subscribeNewMessage = useCallback(
     (callback: (data: NewMessagePayload) => void) => {
@@ -650,23 +609,19 @@ export function SocketProvider({
 
       if (!currentSocket) {
         console.warn(
-          "[Socket] Cannot subscribe message:new. Socket unavailable.",
+          "[Socket] Cannot subscribe message:new. Socket unavailable."
         );
 
         return () => {};
       }
 
-      console.log("[Socket] Subscribe: message:new");
-
       currentSocket.on("message:new", callback);
 
       return () => {
-        console.log("[Socket] Unsubscribe: message:new");
-
         currentSocket.off("message:new", callback);
       };
     },
-    [],
+    []
   );
 
   const subscribeConversationNewMessage = useCallback(
@@ -683,7 +638,7 @@ export function SocketProvider({
         currentSocket.off("conversation:new-message", callback);
       };
     },
-    [],
+    []
   );
 
   return (

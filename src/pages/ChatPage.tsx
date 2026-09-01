@@ -46,10 +46,10 @@ function ChatContent() {
     userData?.login_type === "farmer"
       ? userData?.farmer_id
       : userData?.user_id != null
-        ? String(userData.user_id)
-        : undefined,
+      ? String(userData.user_id)
+      : undefined,
     userData?.login_type,
-    userData?.token,
+    userData?.token
   );
 
   useEffect(() => {
@@ -90,7 +90,7 @@ function ChatContent() {
               last_message: c.last_message,
               last_date_time: c.last_date_time,
               is_seen: c.is_seen,
-            }),
+            })
           );
           setThreads(mapped);
         }
@@ -142,7 +142,7 @@ function ChatContent() {
       joinThread(threadId);
       setSidebarOpen(false);
     },
-    [selectedThread, joinThread, leaveThread, threads],
+    [selectedThread, joinThread, leaveThread, threads]
   );
 
   const refreshThreads = useCallback(async () => {
@@ -162,7 +162,7 @@ function ChatContent() {
           last_message: c.last_message,
           last_date_time: c.last_date_time,
           is_seen: c.is_seen,
-        }),
+        })
       );
       setThreads(mapped);
     }
@@ -177,10 +177,10 @@ function ChatContent() {
       const rawCrops = Array.isArray(json?.data)
         ? json.data
         : Array.isArray(json?.data?.items)
-          ? json.data.items
-          : Array.isArray(json?.data?.crops)
-            ? json.data.crops
-            : [];
+        ? json.data.items
+        : Array.isArray(json?.data?.crops)
+        ? json.data.crops
+        : [];
 
       const normalized = rawCrops
         .map((crop: Record<string, unknown>) => {
@@ -192,19 +192,19 @@ function ChatContent() {
             crop.crop_name_bn,
           ].find(
             (value): value is string =>
-              typeof value === "string" && value.trim().length > 0,
+              typeof value === "string" && value.trim().length > 0
           );
 
           return {
             id: Number(crop.id ?? crop.crop_id ?? crop.cropId),
             name: String(
-              crop.name ?? crop.crop_name ?? crop.cropName ?? "Crop",
+              crop.name ?? crop.crop_name ?? crop.cropName ?? "Crop"
             ),
             crop_bangla_name: banglaName,
           };
         })
         .filter((crop: { id: number; name: string }) =>
-          Number.isFinite(crop.id),
+          Number.isFinite(crop.id)
         );
 
       setCropOptions(normalized);
@@ -234,8 +234,7 @@ function ChatContent() {
 
     const existingThread = threads.find(
       (thread) =>
-        thread.name?.trim().toLowerCase() ===
-        GENERAL_THREAD_NAME.toLowerCase(),
+        thread.name?.trim().toLowerCase() === GENERAL_THREAD_NAME.toLowerCase()
     );
 
     if (existingThread) {
@@ -254,7 +253,7 @@ function ChatContent() {
         null,
         userData.token,
         Number(userData.farmer_id),
-        "general",
+        "general"
       );
 
       if (json.success && json.data?.id) {
@@ -274,7 +273,6 @@ function ChatContent() {
         confirmButtonColor: "#7c3aed",
       });
     } catch (error) {
-      console.log(error);
       await Swal.fire({
         title: "Conversation not created",
         text: error instanceof Error ? error.message : "Please try again.",
@@ -324,7 +322,7 @@ function ChatContent() {
       const json = await createAdvisory(
         Number(selectedCropId),
         userData.token,
-        Number(userData.farmer_id),
+        Number(userData.farmer_id)
       );
 
       if (json.success && json.data?.id) {
@@ -349,7 +347,6 @@ function ChatContent() {
       //   confirmButtonColor: "#7c3aed",
       // });
     } catch (error) {
-      console.log(error);
       // await Swal.fire({
       //   title: "Conversation not created",
       //   text: error instanceof Error ? error.message : "Please try again.",
@@ -375,7 +372,7 @@ function ChatContent() {
     async (threadId: number) => {
       await deleteThread(threadId);
     },
-    [deleteThread],
+    [deleteThread]
   );
 
   const selectedThreadName =
@@ -397,7 +394,7 @@ function ChatContent() {
         selectedThreadName.trim() ||
         undefined;
       const cropNameWithoutEnglish = removeEnglishCropName(
-        resolvedCropName || "",
+        resolvedCropName || ""
       );
 
       chat.sendMessage({
@@ -408,7 +405,7 @@ function ChatContent() {
         crop_name: cropNameWithoutEnglish,
       });
     },
-    [chat, userData, selectedCropName, selectedThreadName],
+    [chat, userData, selectedCropName, selectedThreadName]
   );
 
   const handleTypingStart = useCallback(() => {
@@ -416,7 +413,7 @@ function ChatContent() {
     chat.emitTypingStart(
       userData.name || "Farmer",
       userData.user_id,
-      userData.farmer_id,
+      userData.farmer_id
     );
   }, [chat, userData]);
 
@@ -643,7 +640,7 @@ function ChatContent() {
                     onClick={() => {
                       setSelectedCropId(crop.id);
                       setSelectedCropName(
-                        crop.crop_bangla_name ?? crop.name ?? "",
+                        crop.crop_bangla_name ?? crop.name ?? ""
                       );
                     }}
                     className={`w-full text-left rounded-xl border px-3 py-2.5 transition ${
@@ -696,7 +693,7 @@ function ChatContent() {
             onCreateThread={openCreateThreadDialog}
             onDeleteThread={handleDeleteThread}
             isCreatingThread={isCreatingThread}
-          isLoadingThreads={isLoadingThreads}
+            isLoadingThreads={isLoadingThreads}
           />
         </div>
 
@@ -709,7 +706,7 @@ function ChatContent() {
                   messages={chat.messages}
                   currentUserId={
                     userData.login_type === "farmer"
-                      ? (userData.farmer_id ?? "")
+                      ? userData.farmer_id ?? ""
                       : String(userData.user_id ?? "")
                   }
                   currentUserType={userData.login_type ?? "user"}
