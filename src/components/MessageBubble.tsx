@@ -1,5 +1,62 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import Swal from "sweetalert2";
 import type { MessageResponse } from "../types";
+
+const speechSupported =
+  typeof window !== "undefined" && "speechSynthesis" in window;
+
+function stripToPlainText(html: string): string {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return (div.textContent || div.innerText || "").trim();
+}
+
+// Picks a BCP-47 locale for the browser's speech synthesizer by sniffing
+// which script the message is mostly written in — the app itself doesn't
+// track which language a given AI reply came back in.
+function detectSpeechLocale(text: string): string {
+  if (/[ঀ-৿]/.test(text)) return "bn-BD";
+  if (/[؀-ۿ]/.test(text)) return "ar-SA";
+  return "en-US";
+}
+
+// Setting utterance.lang alone doesn't guarantee a matching voice — many
+// browsers just fall back to whatever their default voice is regardless.
+// Explicitly picking a real installed voice for the language gets a much
+// more native-sounding read instead of a generic/robotic fallback.
+let cachedVoices: SpeechSynthesisVoice[] = [];
+
+function refreshVoiceCache() {
+  if (speechSupported) {
+    cachedVoices = window.speechSynthesis.getVoices();
+  }
+}
+
+if (speechSupported) {
+  refreshVoiceCache();
+  // Voice lists load asynchronously in most browsers — they can be empty
+  // on the very first call, so re-cache once the real list is ready.
+  window.speechSynthesis.onvoiceschanged = refreshVoiceCache;
+}
+
+function pickVoice(locale: string): SpeechSynthesisVoice | undefined {
+  if (cachedVoices.length === 0) refreshVoiceCache();
+  const prefix = locale.split("-")[0].toLowerCase();
+
+  const exact = cachedVoices.find(
+    (v) => v.lang.toLowerCase() === locale.toLowerCase()
+  );
+  if (exact) return exact;
+
+  const sameLanguage = cachedVoices.filter((v) =>
+    v.lang.toLowerCase().startsWith(prefix)
+  );
+  if (sameLanguage.length === 0) return undefined;
+
+  // Prefer an on-device voice — usually higher quality and lower latency
+  // than a remote/network voice.
+  return sameLanguage.find((v) => v.localService) ?? sameLanguage[0];
+}
 
 const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "";
 
@@ -64,6 +121,79 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
   const senderImage = getSenderImage(message);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const cursorRef = useRef<HTMLSpanElement | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const toggleSpeak = () => {
+    if (!speechSupported) return;
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    // Stop whatever else (another bubble) is currently reading — the
+    // synthesizer is a single global queue, not per-element.
+    window.speechSynthesis.cancel();
+
+    const text = stripToPlainText(message.message || "");
+    if (!text) return;
+
+    const locale = detectSpeechLocale(text);
+    const voice = pickVoice(locale);
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = voice?.lang ?? locale;
+    if (voice) utterance.voice = voice;
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // TEMP DIAGNOSTIC (dev builds only): lists every voice this browser/OS
+  // actually has installed for the message's detected language, right on
+  // screen — no devtools needed, since this is mainly useful for checking
+  // a phone where remote debugging isn't handy.
+  const showVoiceDiagnostics = () => {
+    refreshVoiceCache();
+    const text = stripToPlainText(message.message || "");
+    const locale = detectSpeechLocale(text);
+    const prefix = locale.split("-")[0].toLowerCase();
+    const matches = cachedVoices.filter((v) =>
+      v.lang.toLowerCase().startsWith(prefix)
+    );
+
+    Swal.fire({
+      title: `Voices for "${locale}"`,
+      html: `
+        <div style="text-align:left;font-size:13px">
+          <p><b>Total voices on this device:</b> ${cachedVoices.length}</p>
+          <p><b>Matching "${prefix}":</b> ${matches.length}</p>
+          ${
+            matches.length
+              ? `<ul>${matches
+                  .map(
+                    (v) =>
+                      `<li>${v.name} — ${v.lang}${v.localService ? " (on-device)" : " (network)"}</li>`
+                  )
+                  .join("")}</ul>`
+              : "<p>No voice installed for this language on this device/browser.</p>"
+          }
+        </div>
+      `,
+      confirmButtonColor: "#7c3aed",
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (isSpeaking) {
+        window.speechSynthesis.cancel();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -169,9 +299,65 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
           <div ref={contentRef} />
         </div>
         <div
-          className={`text-[10px] mt-1.5 ${isOwn ? "text-white/70" : "text-gray-400"}`}
+          className={`flex items-center gap-1.5 mt-1.5 ${isOwn ? "text-white/70" : "text-gray-400"}`}
         >
-          {formatTime(message.created_at)}
+          <span className="text-[10px]">{formatTime(message.created_at)}</span>
+          {speechSupported && !message.streaming && (
+            <button
+              type="button"
+              onClick={toggleSpeak}
+              className={`p-0.5 rounded transition-colors ${
+                isOwn
+                  ? "hover:bg-white/20"
+                  : isSpeaking
+                    ? "text-purple-500"
+                    : "hover:text-purple-500 hover:bg-purple-50"
+              }`}
+              aria-pressed={isSpeaking}
+              aria-label={isSpeaking ? "Stop reading aloud" : "Read aloud"}
+              title={isSpeaking ? "Stop reading aloud" : "Read aloud"}
+            >
+              {isSpeaking ? (
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"
+                  />
+                </svg>
+              )}
+            </button>
+          )}
+          {speechSupported && !message.streaming && import.meta.env.DEV && (
+            <button
+              type="button"
+              onClick={showVoiceDiagnostics}
+              className={`text-[10px] underline ${isOwn ? "text-white/70" : "text-gray-400"}`}
+              title="Dev only: list installed voices for this language"
+            >
+              voices?
+            </button>
+          )}
         </div>
       </div>
     </div>
