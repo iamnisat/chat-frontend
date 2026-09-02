@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import Swal from "sweetalert2";
 import type { MessageResponse } from "../types";
 
 const speechSupported =
@@ -149,41 +148,6 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
     window.speechSynthesis.speak(utterance);
-  };
-
-  // TEMP DIAGNOSTIC (dev builds only): lists every voice this browser/OS
-  // actually has installed for the message's detected language, right on
-  // screen — no devtools needed, since this is mainly useful for checking
-  // a phone where remote debugging isn't handy.
-  const showVoiceDiagnostics = () => {
-    refreshVoiceCache();
-    const text = stripToPlainText(message.message || "");
-    const locale = detectSpeechLocale(text);
-    const prefix = locale.split("-")[0].toLowerCase();
-    const matches = cachedVoices.filter((v) =>
-      v.lang.toLowerCase().startsWith(prefix)
-    );
-
-    Swal.fire({
-      title: `Voices for "${locale}"`,
-      html: `
-        <div style="text-align:left;font-size:13px">
-          <p><b>Total voices on this device:</b> ${cachedVoices.length}</p>
-          <p><b>Matching "${prefix}":</b> ${matches.length}</p>
-          ${
-            matches.length
-              ? `<ul>${matches
-                  .map(
-                    (v) =>
-                      `<li>${v.name} — ${v.lang}${v.localService ? " (on-device)" : " (network)"}</li>`
-                  )
-                  .join("")}</ul>`
-              : "<p>No voice installed for this language on this device/browser.</p>"
-          }
-        </div>
-      `,
-      confirmButtonColor: "#7c3aed",
-    });
   };
 
   useEffect(() => {
@@ -346,16 +310,6 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
                   />
                 </svg>
               )}
-            </button>
-          )}
-          {speechSupported && !message.streaming && import.meta.env.DEV && (
-            <button
-              type="button"
-              onClick={showVoiceDiagnostics}
-              className={`text-[10px] underline ${isOwn ? "text-white/70" : "text-gray-400"}`}
-              title="Dev only: list installed voices for this language"
-            >
-              voices?
             </button>
           )}
         </div>

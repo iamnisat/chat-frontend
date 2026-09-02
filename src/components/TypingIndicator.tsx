@@ -6,9 +6,10 @@ interface TypingIndicatorProps {
 }
 
 // How many characters to reveal per tick, and how often — tuned to read as
-// a smooth Claude-style typewriter rather than a jarring instant swap.
-const CHARS_PER_TICK = 2;
-const TICK_MS = 18;
+// a smooth, deliberate Claude-style typewriter rather than a jarring
+// instant swap or a too-fast blur of text.
+const CHARS_PER_TICK = 1;
+const TICK_MS = 35;
 
 export function TypingIndicator({
   userName,
