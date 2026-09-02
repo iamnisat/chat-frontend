@@ -55,10 +55,41 @@ export function MessageInput({
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  // Text already in the box when dictation started — final transcripts are
-  // appended after this instead of overwriting it.
+  // Everything already confirmed in the box — kept up to date immediately
+  // on every manual edit AND every newly-recognized final word, so it's
+  // always the single source of truth for "what's actually in the box
+  // right now, discounting only the live interim preview".
   const baseMessageRef = useRef("");
+  // The current engine session's finalized transcript as of the last
+  // onresult call — display-only until the session actually ends, at
+  // which point it's committed into baseMessageRef exactly once. Mobile
+  // engines can report inconsistent/non-monotonic growth between
+  // intermediate results (retranscribing, shifting word boundaries), so
+  // diffing across those events turned out to be unreliably fragile;
+  // trusting only the session's final state avoids that entirely.
+  const currentSessionFinalRef = useRef("");
+  // True only while the user actually wants dictation running — set on
+  // tapping the mic, cleared only by tapping it again, hitting send, or
+  // unmounting. The underlying engine session ends on its own far more
+  // often than that (after basically every pause, even in continuous
+  // mode on many mobile browsers) — onend checks this flag to decide
+  // whether to silently restart a fresh session (because the user never
+  // asked to stop) or to actually stop.
+  const shouldKeepListeningRef = useRef(false);
+  const startSessionRef = useRef<(preserveBase: boolean) => void>(() => {});
+  const restartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speechSupported = getSpeechRecognitionCtor() != null;
+
+  const stopListening = useCallback(() => {
+    // Only path that actually stops dictation for good — tapping the mic
+    // again, sending the message, or (below) a stretch of real silence.
+    shouldKeepListeningRef.current = false;
+    if (restartTimeoutRef.current) {
+      clearTimeout(restartTimeoutRef.current);
+      restartTimeoutRef.current = null;
+    }
+    recognitionRef.current?.stop();
+  }, []);
 
   const handleTyping = useCallback(() => {
     if (!isTyping) {
@@ -73,8 +104,14 @@ export function MessageInput({
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
       onTypingStop();
-    }, 2000);
-  }, [isTyping, onTypingStart, onTypingStop]);
+      // No new speech/typing for 2s — also turn the mic off (rather than
+      // keep restarting sessions waiting for more) so the button's state
+      // reflects that dictation has effectively stopped.
+      if (shouldKeepListeningRef.current) {
+        stopListening();
+      }
+    }, 100000);
+  }, [isTyping, onTypingStart, onTypingStop, stopListening]);
 
   useEffect(() => {
     return () => {
@@ -84,61 +121,127 @@ export function MessageInput({
     };
   }, []);
 
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
-  }, []);
-
-  const startListening = useCallback(() => {
-    if (disabled || isListening) return;
+  // Reassigned on every render so the closure always sees the latest
+  // language/message/disabled — recognition.onend calls through this ref
+  // (rather than a useCallback-produced function directly) so a restart
+  // triggered later by an async event always uses fresh values instead of
+  // whatever was captured when that particular session started.
+  startSessionRef.current = (preserveBase: boolean) => {
+    if (disabled) return;
     const SpeechRecognitionCtor = getSpeechRecognitionCtor();
     if (!SpeechRecognitionCtor) return;
 
     const recognition = new SpeechRecognitionCtor();
     recognition.lang = SPEECH_LOCALE[language];
-    recognition.continuous = true;
+    // Deliberately NOT continuous — mobile engines (Android Chrome
+    // especially) are known to internally re-segment/re-recognize
+    // overlapping audio as separate results in continuous mode, in ways
+    // that happen inside the engine before anything reaches onresult, so
+    // no amount of JS-side result handling can fix it. Single-utterance
+    // mode plus our own restart-on-end below gives the same "keeps
+    // listening until the user stops it" behavior, but driven by us
+    // instead of the engine's less reliable internal continuous handling.
+    recognition.continuous = false;
     recognition.interimResults = true;
 
     // Dictation appends onto whatever was already typed, so keep it as
-    // the fixed prefix and only replace the part after it as speech comes in.
-    baseMessageRef.current = message.trim() ? `${message.trim()} ` : "";
+    // the fixed prefix and only replace the part after it as speech comes
+    // in — unless this is an auto-restart of an already-running session,
+    // in which case the base already reflects everything said so far.
+    if (!preserveBase) {
+      baseMessageRef.current = message.trim() ? `${message.trim()} ` : "";
+    }
+    // A brand new engine session starts its own result list back at
+    // empty, regardless of what the previous session (if any) reported.
+    currentSessionFinalRef.current = "";
 
     recognition.onresult = (event) => {
-      let finalTranscript = "";
+      let sessionFinal = "";
       let interimTranscript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      // Read the full result list from index 0 every time — this is
+      // always "everything finalized in this session so far", used only
+      // to update the live preview below. It's deliberately never diffed
+      // against a previous snapshot or incrementally appended anywhere —
+      // mobile engines can report inconsistent/non-monotonic growth
+      // between events (retranscribing, shifting word boundaries), and
+      // diffing that turned out to just move a duplication bug around
+      // instead of fixing it. This value only gets committed once, in
+      // onend below, when the session's transcript is actually settled.
+      for (let i = 0; i < event.results.length; i++) {
         const result = event.results[i];
         const transcript = result[0]?.transcript ?? "";
         if (result.isFinal) {
-          finalTranscript += transcript;
+          sessionFinal += transcript;
         } else {
           interimTranscript += transcript;
         }
       }
 
-      if (finalTranscript) {
-        baseMessageRef.current = `${baseMessageRef.current}${finalTranscript} `;
-      }
+      currentSessionFinalRef.current = sessionFinal;
 
-      const combined =
-        `${baseMessageRef.current}${interimTranscript}`.trimStart();
+      const combined = `${baseMessageRef.current}${sessionFinal}${
+        sessionFinal && interimTranscript ? " " : ""
+      }${interimTranscript}`.trimStart();
       if (combined.length <= MAX_CHARS) {
         setMessage(combined);
         handleTyping();
       }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
+      // A pause in speech (or a benign abort from restarting/editing)
+      // isn't a real error — it shouldn't stop dictation.
+      if (event.error === "no-speech" || event.error === "aborted") return;
+      shouldKeepListeningRef.current = false;
       setIsListening(false);
     };
 
     recognition.onend = () => {
+      // Commit this session's finalized transcript into the base exactly
+      // once, now that the session has actually ended — the one point
+      // where the engine's transcript is trusted as settled, rather than
+      // trying to reconcile it against intermediate events.
+      if (currentSessionFinalRef.current) {
+        baseMessageRef.current = `${baseMessageRef.current}${currentSessionFinalRef.current} `;
+        currentSessionFinalRef.current = "";
+      }
+
+      if (shouldKeepListeningRef.current) {
+        // The user hasn't tapped the mic to stop, so the engine ending
+        // the session (which happens after basically every pause) isn't
+        // a real stop — restart a fresh one on top of the now-committed
+        // base. Deliberately NOT synchronous: calling start() again in
+        // the same tick as onend is a well-known race that throws
+        // "InvalidStateError" on many browsers, since the engine hasn't
+        // fully released the previous session yet — a short delay avoids it.
+        restartTimeoutRef.current = setTimeout(() => {
+          if (shouldKeepListeningRef.current) {
+            startSessionRef.current(true);
+          }
+        }, 250);
+        return;
+      }
       setIsListening(false);
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
-  }, [disabled, isListening, language, message, handleTyping]);
+    try {
+      recognition.start();
+      setIsListening(true);
+    } catch {
+      // start() can throw synchronously (e.g. that same restart race, or
+      // the mic already being in use) — fail safe instead of leaving
+      // isListening stuck true with no engine actually running.
+      shouldKeepListeningRef.current = false;
+      setIsListening(false);
+    }
+  };
+
+  const startListening = useCallback(() => {
+    if (disabled || isListening) return;
+    shouldKeepListeningRef.current = true;
+    startSessionRef.current(false);
+  }, [disabled, isListening]);
 
   const toggleListening = useCallback(() => {
     if (isListening) {
@@ -150,6 +253,11 @@ export function MessageInput({
 
   useEffect(() => {
     return () => {
+      // Prevent onend's auto-restart from firing during/after unmount.
+      shouldKeepListeningRef.current = false;
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current);
+      }
       recognitionRef.current?.stop();
     };
   }, []);
@@ -165,6 +273,16 @@ export function MessageInput({
       // they say is appended onto what's actually in the box now, not
       // onto the stale text from when dictation started.
       baseMessageRef.current = value;
+
+      if (isListening) {
+        // The active session's pending transcript (not yet committed —
+        // see onend) reflects the pre-edit text. Discard it so it can't
+        // get appended on top of the edit later, and force a clean
+        // restart so the engine starts fresh from what's actually in the
+        // box now instead of continuing to build on stale context.
+        currentSessionFinalRef.current = "";
+        recognitionRef.current?.abort();
+      }
       handleTyping();
     }
   };
@@ -268,8 +386,8 @@ export function MessageInput({
               isListening
                 ? "Stop voice input"
                 : `Speak in ${
-                    LANGUAGE_OPTIONS.find((o) => o.value === language)
-                      ?.label ?? "selected language"
+                    LANGUAGE_OPTIONS.find((o) => o.value === language)?.label ??
+                    "selected language"
                   }`
             }
             title={isListening ? "Stop voice input" : "Voice input"}
