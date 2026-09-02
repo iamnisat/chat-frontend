@@ -38,6 +38,58 @@ if (speechSupported) {
   window.speechSynthesis.onvoiceschanged = refreshVoiceCache;
 }
 
+// Wraps the text in [start, end) — offsets into the *plain-text* version
+// of `root`'s content — in a highlight <mark>, so the currently-spoken
+// word can be highlighted even though the bubble's actual content is
+// rendered HTML (paragraphs, bold, lists, ...) rather than flat text.
+// Rebuilds the text-node map fresh each call since the previous
+// highlight's DOM surgery (see clearSpeechHighlight) invalidates any
+// cached one.
+function highlightSpeechRange(root: HTMLElement, start: number, end: number) {
+  clearSpeechHighlight(root);
+  if (end <= start) return;
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let offset = 0;
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const text = node as Text;
+    const nodeStart = offset;
+    const nodeEnd = offset + text.data.length;
+    offset = nodeEnd;
+    if (nodeEnd <= start || nodeStart >= end) continue;
+
+    const localStart = Math.max(0, start - nodeStart);
+    const localEnd = Math.min(text.data.length, end - nodeStart);
+    if (localStart >= localEnd) continue;
+
+    try {
+      const range = document.createRange();
+      range.setStart(text, localStart);
+      range.setEnd(text, localEnd);
+      const mark = document.createElement("mark");
+      mark.className = "speech-highlight";
+      range.surroundContents(mark);
+    } catch {
+      // A range that doesn't cleanly fit inside one text node (rare, at
+      // element boundaries) — skip highlighting that fragment rather
+      // than crash the read-aloud flow over a cosmetic detail.
+    }
+  }
+}
+
+function clearSpeechHighlight(root: HTMLElement) {
+  const marks = root.querySelectorAll("mark.speech-highlight");
+  marks.forEach((mark) => {
+    const parent = mark.parentNode;
+    if (!parent) return;
+    while (mark.firstChild) {
+      parent.insertBefore(mark.firstChild, mark);
+    }
+    parent.removeChild(mark);
+  });
+}
+
 function pickVoice(locale: string): SpeechSynthesisVoice | undefined {
   if (cachedVoices.length === 0) refreshVoiceCache();
   const prefix = locale.split("-")[0].toLowerCase();
@@ -128,6 +180,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     if (isSpeaking) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
+      if (contentRef.current) clearSpeechHighlight(contentRef.current);
       return;
     }
 
@@ -145,8 +198,38 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     utterance.lang = voice?.lang ?? locale;
     if (voice) utterance.voice = voice;
     utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      if (contentRef.current) clearSpeechHighlight(contentRef.current);
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      if (contentRef.current) clearSpeechHighlight(contentRef.current);
+    };
+    utterance.onboundary = (event) => {
+      // Only word boundaries — "sentence" events also fire in some
+      // browsers and would highlight far more than the spoken word.
+      // (Some engines omit `name` entirely; treat that as "word" too
+      // rather than skip highlighting altogether.)
+      if (event.name && event.name !== "word") return;
+      const el = contentRef.current;
+      if (!el) return;
+
+      const start = event.charIndex;
+      // charLength isn't supported everywhere — fall back to scanning
+      // for the next word-breaking character in the same plain text
+      // that was actually handed to the utterance.
+      const end =
+        typeof event.charLength === "number" && event.charLength > 0
+          ? start + event.charLength
+          : (() => {
+              const rest = text.slice(start);
+              const match = rest.match(/\s|$/);
+              return start + (match ? match.index! : rest.length);
+            })();
+
+      highlightSpeechRange(el, start, end);
+    };
     window.speechSynthesis.speak(utterance);
   };
 
@@ -154,6 +237,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     return () => {
       if (isSpeaking) {
         window.speechSynthesis.cancel();
+        if (contentRef.current) clearSpeechHighlight(contentRef.current);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

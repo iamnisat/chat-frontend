@@ -278,6 +278,15 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* The word currently being read aloud (see toggleSpeak's onboundary
+   handler) — a plain background highlight rather than a color change, so
+   it reads clearly against both the AI and the farmer bubble gradients. */
+.speech-highlight {
+  background: rgba(124, 58, 237, 0.22);
+  border-radius: 0.2em;
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.12);
+}
+
 .ai-message-content p {
   margin-bottom: 0.5rem;
   line-height: 1.6;
