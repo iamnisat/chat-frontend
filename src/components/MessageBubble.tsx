@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MessageResponse } from "../types";
 
 const speechSupported =
@@ -10,13 +10,25 @@ function stripToPlainText(html: string): string {
   return (div.textContent || div.innerText || "").trim();
 }
 
-// Picks a BCP-47 locale for the browser's speech synthesizer by sniffing
-// which script the message is mostly written in — the app itself doesn't
-// track which language a given AI reply came back in.
+// Which of the app's three languages a message is written in, sniffed from
+// its script — neither the server's message payload nor the socket events
+// carry the language a given reply came back in, so the text itself is the
+// only thing available to go on.
+function detectLanguage(text: string): "bn" | "ar" | "en" {
+  if (/[ঀ-৿]/.test(text)) return "bn";
+  if (/[؀-ۿ]/.test(text)) return "ar";
+  return "en";
+}
+
+const SPEECH_LOCALES: Record<"bn" | "ar" | "en", string> = {
+  bn: "bn-BD",
+  ar: "ar-SA",
+  en: "en-US",
+};
+
+// Picks a BCP-47 locale for the browser's speech synthesizer.
 function detectSpeechLocale(text: string): string {
-  if (/[ঀ-৿]/.test(text)) return "bn-BD";
-  if (/[؀-ۿ]/.test(text)) return "ar-SA";
-  return "en-US";
+  return SPEECH_LOCALES[detectLanguage(text)];
 }
 
 // Setting utterance.lang alone doesn't guarantee a matching voice — many
@@ -173,6 +185,15 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const cursorRef = useRef<HTMLSpanElement | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  // Sniffed from the message's own text (see detectLanguage) since nothing
+  // in the payload records which language a reply came back in. Tags the
+  // rendered content below so assistive tech reads it with the right
+  // pronunciation. Stripped of markup first — the raw message can be HTML,
+  // whose Latin tag names would otherwise outvote the actual text.
+  const contentLanguage = useMemo(
+    () => detectLanguage(stripToPlainText(message.message)),
+    [message.message]
+  );
 
   const toggleSpeak = () => {
     if (!speechSupported) return;
@@ -348,13 +369,26 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
           <div className="flex items-center gap-2 mb-1">
             <span className="sm:hidden flex-shrink-0">{avatar}</span>
             <span
+              dir="auto"
               className={`text-xs font-semibold ${isAI ? "text-purple-600" : "text-emerald-600"}`}
             >
               {message.sender_name}
             </span>
           </div>
         )}
-        <div className="text-sm ai-message-content">
+        {/* dir="auto" rather than a hardcoded direction: the browser picks
+            the direction from the first strong directional character, so an
+            Arabic reply lays out right-to-left (and its punctuation lands on
+            the correct side) while Bengali and English stay left-to-right,
+            with no language field on the message to consult. lang is set
+            from the same script sniffing the speech synthesizer uses, so
+            screen readers pronounce the text with the right phonetics
+            instead of reading Bengali and Arabic as English. */}
+        <div
+          className="text-sm ai-message-content"
+          dir="auto"
+          lang={contentLanguage}
+        >
           <div ref={contentRef} />
         </div>
         <div

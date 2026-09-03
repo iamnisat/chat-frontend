@@ -166,8 +166,13 @@ export function ThreadList({
                       />
                     </svg>
                   </div>
+                  {/* Thread titles and previews are user/AI text, so they
+                      can be Arabic while the surrounding chrome is English —
+                      dir="auto" lets each resolve its own direction, which
+                      also puts the truncation ellipsis on the correct end. */}
                   <div className="flex-1 min-w-0">
                     <div
+                      dir="auto"
                       className={`text-sm font-semibold truncate ${
                         isSelected ? "text-purple-700" : "text-gray-700"
                       }`}
@@ -175,7 +180,10 @@ export function ThreadList({
                       {thread.name}
                     </div>
                     {thread.last_message && (
-                      <div className="text-xs text-gray-400 mt-0.5 truncate">
+                      <div
+                        dir="auto"
+                        className="text-xs text-gray-400 mt-0.5 truncate"
+                      >
                         {stripHtml(thread.last_message)}
                       </div>
                     )}

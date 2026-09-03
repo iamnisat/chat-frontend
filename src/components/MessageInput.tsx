@@ -551,6 +551,13 @@ export function MessageInput({
             onKeyDown={handleKeyDown}
             placeholder="Message..."
             disabled={disabled}
+            // Follows what's actually being typed rather than the language
+            // selector: the selector chooses the language Aunkur replies in,
+            // which is not necessarily the one the user writes the question
+            // in. Empty (and while the placeholder shows) this resolves to
+            // the page direction, so the box only flips once Arabic is
+            // actually entered — including when dictated.
+            dir="auto"
             className="w-full resize-none overflow-y-auto bg-transparent px-4 py-2.5 text-base sm:text-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400"
             rows={1}
             maxLength={MAX_CHARS + 100}

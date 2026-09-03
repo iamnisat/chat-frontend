@@ -296,10 +296,14 @@ body {
   margin-bottom: 0;
 }
 
+/* Logical rather than physical, so the bullets/numbers sit on the correct
+   side when a message renders right-to-left (see dir="auto" on the content
+   container). padding-left would leave an Arabic list indented away from
+   its own text. */
 .ai-message-content ul,
 .ai-message-content ol {
   margin: 0.5rem 0;
-  padding-left: 1.5rem;
+  padding-inline-start: 1.5rem;
 }
 
 .ai-message-content ul {
@@ -381,7 +385,9 @@ body {
 .ai-message-content td {
   border: 1px solid #e9d5ff;
   padding: 0.5rem 0.75rem;
-  text-align: left;
+  /* `start`, not `left`, so cells align to the reading direction — an
+     Arabic table would otherwise sit flush against the wrong edge. */
+  text-align: start;
   font-size: 0.8125rem;
 }
 
