@@ -289,39 +289,43 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     }
   }, [message.id, message.message, message.streaming]);
 
+  // Rendered in one of two places depending on screen width — outside the
+  // bubble on desktop, inside its header on phones — so it's built once
+  // here rather than duplicated at both call sites.
+  const avatar = senderImage ? (
+    <img
+      src={senderImage}
+      alt={message.sender_name}
+      className="w-8 h-8 rounded-lg object-cover"
+      onError={(e) => {
+        e.currentTarget.src = isAI ? AI_PLACEHOLDER : FARMER_PLACEHOLDER;
+      }}
+    />
+  ) : (
+    <div
+      className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white"
+      style={{
+        background: isAI
+          ? "var(--own-gradient)"
+          : "linear-gradient(135deg, #34d399 0%, #10b981 100%)",
+      }}
+    >
+      {message.sender_name?.charAt(0).toUpperCase() || "U"}
+    </div>
+  );
+
   return (
     <div
       className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-3 animate-fade-in-up`}
     >
+      {/* Desktop only: the avatar sits in its own gutter beside the bubble.
+          On a phone that gutter costs width the message text needs, so
+          there the avatar moves inside the card's header instead. */}
       {!isOwn && (
-        <div className="flex-shrink-0 mr-2 mt-1">
-          {senderImage ? (
-            <img
-              src={senderImage}
-              alt={message.sender_name}
-              className="w-8 h-8 rounded-lg object-cover"
-              onError={(e) => {
-                e.currentTarget.src = isAI
-                  ? AI_PLACEHOLDER
-                  : FARMER_PLACEHOLDER;
-              }}
-            />
-          ) : (
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white"
-              style={{
-                background: isAI
-                  ? "var(--own-gradient)"
-                  : "linear-gradient(135deg, #34d399 0%, #10b981 100%)",
-              }}
-            >
-              {message.sender_name?.charAt(0).toUpperCase() || "U"}
-            </div>
-          )}
-        </div>
+        <div className="hidden sm:block flex-shrink-0 mr-2 mt-1">{avatar}</div>
       )}
       <div
-        className={`max-w-[80%] md:max-w-[65%] rounded-2xl px-4 py-2.5 shadow-sm ${
+        className={`max-w-[92%] sm:max-w-[80%] md:max-w-[65%] rounded-2xl px-4 py-2.5 shadow-sm ${
           isOwn
             ? "text-white rounded-br-md"
             : isAI
@@ -337,10 +341,17 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
         }}
       >
         {!isOwn && (
-          <div
-            className={`text-xs font-semibold mb-1 ${isAI ? "text-purple-600" : "text-emerald-600"}`}
-          >
-            {message.sender_name}
+          // The card's header line: on phones it carries the avatar next to
+          // the name, since the avatar has no gutter to live in there. From
+          // sm up the avatar is outside the card again, so only the name is
+          // left here — which is what this header has always shown.
+          <div className="flex items-center gap-2 mb-1">
+            <span className="sm:hidden flex-shrink-0">{avatar}</span>
+            <span
+              className={`text-xs font-semibold ${isAI ? "text-purple-600" : "text-emerald-600"}`}
+            >
+              {message.sender_name}
+            </span>
           </div>
         )}
         <div className="text-sm ai-message-content">
