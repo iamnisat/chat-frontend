@@ -40,6 +40,34 @@ function getSpeechRecognitionCtor(): SpeechRecognitionConstructor | undefined {
   return window.SpeechRecognition ?? window.webkitSpeechRecognition;
 }
 
+// Once a site's mic permission is actually denied, no browser will show its
+// native prompt again from a JS call — the only way "back in" is the
+// browser's own site-settings UI. iOS Safari buries that in a different
+// place than everything else, so the blocked-state dialog below gives
+// platform-specific steps rather than one generic "check your settings".
+function isIOSSafari(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  const isIOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    // iPadOS 13+ reports as Mac but with touch support.
+    (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
+  const isWebKit = /WebKit/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+  return isIOS && isWebKit;
+}
+
+function isMacSafari(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return (
+    ua.includes("Macintosh") &&
+    /Safari/.test(ua) &&
+    // Chrome and Edge both carry "Safari" in their UA string.
+    !/Chrome|Chromium|Edg\//.test(ua) &&
+    !isIOSSafari()
+  );
+}
+
 export function MessageInput({
   onSendMessage,
   onTypingStart,
@@ -52,6 +80,12 @@ export function MessageInput({
   const [isTyping, setIsTyping] = useState(false);
   const [language, setLanguage] = useState<LanguageType>("bn");
   const [isListening, setIsListening] = useState(false);
+  // Drives the in-app permission dialog. "blocked" is the only state:
+  // access was actually denied, so the browser won't re-show its own
+  // native prompt — this dialog walks the user through re-enabling it
+  // themselves instead.
+  const [micPrompt, setMicPrompt] = useState<"blocked" | null>(null);
+  const [micErrorMessage, setMicErrorMessage] = useState<string | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -78,6 +112,14 @@ export function MessageInput({
   const shouldKeepListeningRef = useRef(false);
   const startSessionRef = useRef<(preserveBase: boolean) => void>(() => {});
   const restartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Whether the session currently starting was kicked off by an actual tap
+  // on the mic button, as opposed to onend's automatic restart. iOS Safari
+  // only grants mic access to a start() that happens inside a user gesture
+  // — an auto-restart fires from a timer instead, so it can fail with
+  // "not-allowed" even though the user granted permission perfectly well.
+  // Treating that as a denial is what produced the "blocked" dialog on
+  // every tap; only a gesture-started session's denial is a real denial.
+  const isUserInitiatedRef = useRef(false);
   const speechSupported = getSpeechRecognitionCtor() != null;
 
   const stopListening = useCallback(() => {
@@ -194,6 +236,65 @@ export function MessageInput({
       if (event.error === "no-speech" || event.error === "aborted") return;
       shouldKeepListeningRef.current = false;
       setIsListening(false);
+      // Surfaced in every message below. The Web Speech API's failure modes
+      // are genuinely hard to tell apart from the outside — several
+      // unrelated causes arrive as the same code — so showing the raw code
+      // makes a report like "it just doesn't work" diagnosable instead of
+      // guesswork.
+      const code = event.error;
+
+      // Only a session the user actually started by tapping the mic can be
+      // trusted to report a genuine denial — see isUserInitiatedRef. An
+      // auto-restart failing this way just means the browser wanted a
+      // fresh gesture, so end quietly and let the next tap start a new one.
+      if (
+        (code === "not-allowed" || code === "service-not-allowed") &&
+        !isUserInitiatedRef.current
+      ) {
+        return;
+      }
+
+      if (code === "not-allowed") {
+        if (!window.isSecureContext) {
+          // The real cause here isn't the user's choice at all: browsers
+          // refuse mic access outright on a non-HTTPS origin and report it
+          // as a permission denial. Telling the user to fix their
+          // permissions would send them chasing a setting that was never
+          // the problem.
+          setMicErrorMessage(
+            "Voice input needs a secure (HTTPS) connection. Open this site over HTTPS and try again."
+          );
+          return;
+        }
+        setMicPrompt("blocked");
+      } else if (code === "service-not-allowed") {
+        // Deliberately NOT the "blocked" dialog. Despite the name, this
+        // usually means the OS speech service refused the *request*, not
+        // that the user denied the mic — most often because the OS has no
+        // dictation support installed for recognition.lang (macOS/iOS only
+        // recognize languages present in the system dictation settings),
+        // or the browser is blocked from the service at the OS level.
+        // Sending the user to site permissions here is a dead end.
+        setMicErrorMessage(
+          `Your device's speech service refused this request (${code}) — often it has no dictation support installed for ${SPEECH_LOCALE[language]}. Try switching the reply language to English, or add that language in your system dictation settings.`
+        );
+      } else if (code === "language-not-supported") {
+        setMicErrorMessage(
+          `Your device can't recognize speech in ${SPEECH_LOCALE[language]}. Try switching the reply language to English.`
+        );
+      } else if (code === "audio-capture") {
+        setMicErrorMessage(
+          `No microphone was found on this device (${code}).`
+        );
+      } else if (code === "network") {
+        setMicErrorMessage(
+          `Speech recognition couldn't reach its service (${code}). Check your connection and try again.`
+        );
+      } else {
+        setMicErrorMessage(
+          `Voice input stopped unexpectedly (${code}). Please try again.`
+        );
+      }
     };
 
     recognition.onend = () => {
@@ -216,6 +317,7 @@ export function MessageInput({
         // fully released the previous session yet — a short delay avoids it.
         restartTimeoutRef.current = setTimeout(() => {
           if (shouldKeepListeningRef.current) {
+            isUserInitiatedRef.current = false;
             startSessionRef.current(true);
           }
         }, 250);
@@ -237,8 +339,30 @@ export function MessageInput({
     }
   };
 
-  const startListening = useCallback(() => {
+  // Starts recognition directly — recognition.start() itself triggers the
+  // browser's native mic permission prompt (confirmed: that's the "system
+  // prompt" seen on iOS Safari), so there's no need to pre-flight
+  // getUserMedia ourselves. That was tried, but on iOS it actively broke
+  // things: acquiring the mic via getUserMedia, releasing it immediately,
+  // then handing off to recognition.start() (which does its own separate
+  // mic acquisition) races the hardware release — recognition's own
+  // permission check then fails right after the user already allowed it,
+  // in a way indistinguishable from an actual denial. Letting
+  // recognition.start() own mic acquisition end-to-end avoids that race;
+  // recognition.onerror below still catches a real denial.
+  const requestMicAndStart = useCallback(() => {
     if (disabled || isListening) return;
+    setMicErrorMessage(null);
+    setMicPrompt(null);
+    if (!window.isSecureContext) {
+      // Fail with the actual reason up front rather than letting the
+      // engine report this as a permission denial (see onerror above).
+      setMicErrorMessage(
+        "Voice input needs a secure (HTTPS) connection. Open this site over HTTPS and try again."
+      );
+      return;
+    }
+    isUserInitiatedRef.current = true;
     shouldKeepListeningRef.current = true;
     startSessionRef.current(false);
   }, [disabled, isListening]);
@@ -246,10 +370,14 @@ export function MessageInput({
   const toggleListening = useCallback(() => {
     if (isListening) {
       stopListening();
-    } else {
-      startListening();
+      return;
     }
-  }, [isListening, startListening, stopListening]);
+    if (disabled) return;
+    // Go straight to the browser's own native permission prompt on tap —
+    // no custom explainer step first. If it's already blocked, requestMicAndStart
+    // below detects that and shows the re-enable dialog instead.
+    requestMicAndStart();
+  }, [disabled, isListening, requestMicAndStart, stopListening]);
 
   useEffect(() => {
     return () => {
@@ -476,6 +604,13 @@ export function MessageInput({
           )}
         </button>
       </div>
+      {micErrorMessage && (
+        <div className="max-w-3xl mx-auto mt-1.5 px-1">
+          <span className="text-[11px] font-medium text-rose-500">
+            {micErrorMessage}
+          </span>
+        </div>
+      )}
       <div className="max-w-3xl mx-auto mt-1.5 flex justify-end px-1">
         <span
           className={`text-[10px] font-medium transition-colors ${
@@ -488,6 +623,130 @@ export function MessageInput({
         >
           {charCount > 0 ? `${charCount}/${MAX_CHARS}` : ""}
         </span>
+      </div>
+
+      {micPrompt === "blocked" && (
+        <MicPermissionDialog
+          title="Microphone access blocked"
+          onCancel={() => setMicPrompt(null)}
+          onPrimary={requestMicAndStart}
+          primaryLabel="Try again"
+        >
+          {isIOSSafari() ? (
+            <ol className="list-decimal list-inside space-y-1">
+              <li>
+                Tap the <strong>"aA"</strong> icon at the left of the address
+                bar.
+              </li>
+              <li>
+                Tap <strong>Website Settings</strong>.
+              </li>
+              <li>
+                Set <strong>Microphone</strong> to <strong>Allow</strong>.
+              </li>
+              <li>Come back here and tap "Try again".</li>
+            </ol>
+          ) : isMacSafari() ? (
+            // macOS Safari has no per-site mic control in the address bar,
+            // and blocks two levels up as well — the site can be allowed
+            // in Safari while Safari itself is denied the mic by macOS, in
+            // which case only the System Settings step below fixes it.
+            <ol className="list-decimal list-inside space-y-1">
+              <li>
+                Open <strong>Safari → Settings → Websites → Microphone</strong>{" "}
+                and set this site to <strong>Allow</strong>.
+              </li>
+              <li>
+                Then check{" "}
+                <strong>
+                  System Settings → Privacy &amp; Security → Microphone
+                </strong>{" "}
+                and make sure <strong>Safari</strong> is enabled.
+              </li>
+              <li>Come back here and click "Try again".</li>
+            </ol>
+          ) : (
+            <ol className="list-decimal list-inside space-y-1">
+              <li>Tap the icon (lock or site info) in the address bar.</li>
+              <li>
+                Find <strong>Microphone</strong> permissions and set it to{" "}
+                <strong>Allow</strong>.
+              </li>
+              <li>Come back here and tap "Try again".</li>
+            </ol>
+          )}
+        </MicPermissionDialog>
+      )}
+    </div>
+  );
+}
+
+function MicPermissionDialog({
+  title,
+  children,
+  onCancel,
+  onPrimary,
+  primaryLabel,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onCancel: () => void;
+  onPrimary: () => void;
+  primaryLabel: string;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full text-white"
+          style={{ background: "var(--own-gradient)" }}
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+            />
+          </svg>
+        </div>
+        <h2 className="text-center text-base font-semibold text-gray-900">
+          {title}
+        </h2>
+        <div className="mt-2 text-sm text-gray-600 [&_ol]:mt-1">
+          {children}
+        </div>
+        <div className="mt-5 flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 rounded-full border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Not now
+          </button>
+          <button
+            type="button"
+            onClick={onPrimary}
+            className="flex-1 rounded-full py-2.5 text-sm font-medium text-white shadow-sm hover:opacity-90"
+            style={{ background: "var(--own-gradient)" }}
+          >
+            {primaryLabel}
+          </button>
+        </div>
       </div>
     </div>
   );
