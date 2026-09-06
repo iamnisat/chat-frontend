@@ -194,6 +194,53 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     () => detectLanguage(stripToPlainText(message.message)),
     [message.message]
   );
+  const [copied, setCopied] = useState(false);
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCopy = async () => {
+    // The message is stored as HTML; copy what the user actually sees
+    // rather than the markup around it.
+    const text = stripToPlainText(message.message);
+    if (!text) return;
+
+    try {
+      // navigator.clipboard is gated behind a secure context, so it's
+      // simply absent when the app is opened over plain http on a LAN
+      // address (a phone pointed at the dev server, most often). Falling
+      // back to the old execCommand path keeps copy working there instead
+      // of failing silently on exactly the devices it gets tested on.
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const helper = document.createElement("textarea");
+        helper.value = text;
+        // Kept off-screen and non-focusable-looking so the page doesn't
+        // visibly jump while the selection is made.
+        helper.setAttribute("readonly", "");
+        helper.style.position = "fixed";
+        helper.style.top = "-9999px";
+        document.body.appendChild(helper);
+        helper.select();
+        document.execCommand("copy");
+        document.body.removeChild(helper);
+      }
+
+      setCopied(true);
+      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+      copiedTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard access can be refused outright (permissions policy, a
+      // hardened browser). Nothing useful to recover with, and a thrown
+      // error here would take the bubble down, so leave the icon unchanged
+      // — the absence of the tick is the signal that it didn't take.
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+    };
+  }, []);
 
   const toggleSpeak = () => {
     if (!speechSupported) return;
@@ -436,6 +483,51 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"
+                  />
+                </svg>
+              )}
+            </button>
+          )}
+          {!message.streaming && (
+            <button
+              type="button"
+              onClick={handleCopy}
+              className={`p-0.5 rounded transition-colors ${
+                isOwn
+                  ? "hover:bg-white/20"
+                  : copied
+                    ? "text-purple-500"
+                    : "hover:text-purple-500 hover:bg-purple-50"
+              }`}
+              aria-label={copied ? "Copied" : "Copy message"}
+              title={copied ? "Copied" : "Copy message"}
+            >
+              {copied ? (
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4.5 12.75l6 6 9-13.5"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"
                   />
                 </svg>
               )}
