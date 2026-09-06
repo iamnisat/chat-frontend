@@ -12,7 +12,6 @@ interface ThreadListProps {
   selectedThread: number | null;
   onSelectThread: (threadId: number) => void;
   onCreateThread?: () => void;
-  onDeleteThread?: (threadId: number) => void;
   className?: string;
   isCreatingThread?: boolean;
   isLoadingThreads?: boolean;
@@ -27,24 +26,33 @@ const THREAD_ICONS: Record<number, string> = {
 
 const DEFAULT_ICON = "M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z";
 
+// The upstream API doesn't document what values the conversation `mode`
+// field takes, so match on a normalized form and fall back to showing
+// whatever came back rather than hiding a value we don't recognize — an
+// unfamiliar label is more useful than a silently missing one.
+function formatThreadMode(mode?: string): string | null {
+  const raw = mode?.trim();
+  if (!raw) return null;
+  const normalized = raw.toLowerCase();
+  if (["ai", "ai_agent", "agent", "bot", "auto"].includes(normalized)) {
+    return "AI";
+  }
+  if (["human", "manual", "user", "expert", "admin"].includes(normalized)) {
+    return "Human";
+  }
+  return raw;
+}
+
 export function ThreadList({
   threads,
   selectedThread,
   onSelectThread,
   onCreateThread,
-  onDeleteThread,
   className = "",
   isCreatingThread,
   isLoadingThreads,
   createButtonRef,
 }: ThreadListProps) {
-  const handleDelete = (e: React.MouseEvent, threadId: number) => {
-    e.stopPropagation();
-    if (onDeleteThread && window.confirm("Delete this thread?")) {
-      onDeleteThread(threadId);
-    }
-  };
-
   return (
     <div className={`flex flex-col h-full ${className}`}>
       <div className="p-5 pb-3">
@@ -124,13 +132,14 @@ export function ThreadList({
         ) : (
           threads.map((thread, index) => {
             const isSelected = selectedThread === thread.id;
+            const threadMode = formatThreadMode(thread.mode);
             const icon = THREAD_ICONS[thread.id] || DEFAULT_ICON;
 
             return (
               <button
                 key={thread.id}
                 onClick={() => onSelectThread(thread.id)}
-                className={`w-full text-left px-3.5 py-3 rounded-xl transition-all duration-200 group ${
+                className={`w-full text-left px-3.5 py-3 rounded-xl transition-all duration-200 ${
                   isSelected
                     ? "bg-white shadow-md shadow-purple-100 scale-[1.02]"
                     : "hover:bg-white/60 hover:shadow-sm"
@@ -171,13 +180,30 @@ export function ThreadList({
                       dir="auto" lets each resolve its own direction, which
                       also puts the truncation ellipsis on the correct end. */}
                   <div className="flex-1 min-w-0">
-                    <div
-                      dir="auto"
-                      className={`text-sm font-semibold truncate ${
-                        isSelected ? "text-purple-700" : "text-gray-700"
-                      }`}
-                    >
-                      {thread.name}
+                    {/* The mode sits in its own non-shrinking element rather
+                        than being concatenated into the name: the name
+                        truncates, and appending to it would let a long crop
+                        name push the mode out of sight — which is the part
+                        that distinguishes two otherwise identically-named
+                        threads. */}
+                    <div className="flex items-baseline gap-1">
+                      <span
+                        dir="auto"
+                        className={`text-sm font-semibold truncate ${
+                          isSelected ? "text-purple-700" : "text-gray-700"
+                        }`}
+                      >
+                        {thread.name}
+                      </span>
+                      {threadMode && (
+                        <span
+                          className={`text-[11px] font-medium flex-shrink-0 ${
+                            isSelected ? "text-purple-400" : "text-gray-400"
+                          }`}
+                        >
+                          ({threadMode})
+                        </span>
+                      )}
                     </div>
                     {thread.last_message && (
                       <div
@@ -188,27 +214,6 @@ export function ThreadList({
                       </div>
                     )}
                   </div>
-                  {onDeleteThread && (
-                    <button
-                      onClick={(e) => handleDelete(e, thread.id)}
-                      className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-                      title="Delete thread"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                        />
-                      </svg>
-                    </button>
-                  )}
                   {isSelected && (
                     <div
                       className="w-1.5 h-8 rounded-full flex-shrink-0"

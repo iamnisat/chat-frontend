@@ -39,7 +39,7 @@ function ChatContent() {
   const [selectedCropId, setSelectedCropId] = useState<number | null>(null);
   const [selectedCropName, setSelectedCropName] = useState<string>("");
   const [isLoadingCrops, setIsLoadingCrops] = useState(false);
-  const { joinThread, leaveThread, socket, deleteThread } = useSocketContext();
+  const { joinThread, leaveThread, socket } = useSocketContext();
   const [userData, setUserData] = useState<UserPayload | null>(null);
   const chat = useChat(
     selectedThread,
@@ -84,12 +84,14 @@ function ChatContent() {
               last_message?: string;
               last_date_time?: number;
               is_seen?: boolean;
+              mode?: string;
             }) => ({
               id: c.id,
               name: c.conv_name,
               last_message: c.last_message,
               last_date_time: c.last_date_time,
               is_seen: c.is_seen,
+              mode: c.mode,
             })
           );
           setThreads(mapped);
@@ -156,12 +158,14 @@ function ChatContent() {
           last_message?: string;
           last_date_time?: number;
           is_seen?: boolean;
+          mode?: string;
         }) => ({
           id: c.id,
           name: c.conv_name,
           last_message: c.last_message,
           last_date_time: c.last_date_time,
           is_seen: c.is_seen,
+          mode: c.mode,
         })
       );
       setThreads(mapped);
@@ -368,13 +372,6 @@ function ChatContent() {
     joinThread,
   ]);
 
-  const handleDeleteThread = useCallback(
-    async (threadId: number) => {
-      await deleteThread(threadId);
-    },
-    [deleteThread]
-  );
-
   const selectedThreadName =
     threads.find((t) => t.id === selectedThread)?.name || "";
   const removeEnglishCropName = (cropName: string = ""): string => {
@@ -562,7 +559,6 @@ function ChatContent() {
           selectedThread={selectedThread}
           onSelectThread={handleSelectThread}
           onCreateThread={openCreateThreadDialog}
-          onDeleteThread={handleDeleteThread}
           isCreatingThread={isCreatingThread}
           isLoadingThreads={isLoadingThreads}
         />
@@ -692,7 +688,6 @@ function ChatContent() {
             selectedThread={selectedThread}
             onSelectThread={handleSelectThread}
             onCreateThread={openCreateThreadDialog}
-            onDeleteThread={handleDeleteThread}
             isCreatingThread={isCreatingThread}
             isLoadingThreads={isLoadingThreads}
           />

@@ -70,6 +70,11 @@ export interface ThreadModule {
   last_date_time?: number;
   is_seen?: boolean;
   conv_name?: string;
+  // Whether the conversation is being handled by the AI or by a person.
+  // Passed straight through from the upstream GraphQL API, which doesn't
+  // document its value set — hence the open `string` and the normalizing
+  // in formatThreadMode rather than a union of guessed literals.
+  mode?: string;
   thread?: {
     id: number;
     land: string | null;
