@@ -5,9 +5,9 @@ const speechSupported =
   typeof window !== "undefined" && "speechSynthesis" in window;
 
 function stripToPlainText(html: string): string {
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return (div.textContent || div.innerText || "").trim();
+  const p = document.createElement("p");
+  p.innerHTML = html;
+  return p.textContent || p.innerText || "";
 }
 
 // Which of the app's three languages a message is written in, sniffed from
@@ -107,12 +107,12 @@ function pickVoice(locale: string): SpeechSynthesisVoice | undefined {
   const prefix = locale.split("-")[0].toLowerCase();
 
   const exact = cachedVoices.find(
-    (v) => v.lang.toLowerCase() === locale.toLowerCase()
+    (v) => v.lang.toLowerCase() === locale.toLowerCase(),
   );
   if (exact) return exact;
 
   const sameLanguage = cachedVoices.filter((v) =>
-    v.lang.toLowerCase().startsWith(prefix)
+    v.lang.toLowerCase().startsWith(prefix),
   );
   if (sameLanguage.length === 0) return undefined;
 
@@ -192,7 +192,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
   // whose Latin tag names would otherwise outvote the actual text.
   const contentLanguage = useMemo(
     () => detectLanguage(stripToPlainText(message.message)),
-    [message.message]
+    [message.message],
   );
   const [copied, setCopied] = useState(false);
   const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
