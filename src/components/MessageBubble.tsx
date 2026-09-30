@@ -1,19 +1,56 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import type { MessageResponse } from "../types";
 
 const speechSupported =
   typeof window !== "undefined" && "speechSynthesis" in window;
 
-function stripToPlainText(html: string): string {
-  const p = document.createElement("p");
-  p.innerHTML = html;
-  return p.textContent || p.innerText || "";
+/* =========================================================
+   TEXT HELPERS
+========================================================= */
+
+function normalizeMarkdown(content: string = ""): string {
+  return (
+    content
+      // Escaped newlines coming from API/socket
+      .replace(/\\r\\n/g, "\n")
+      .replace(/\\n/g, "\n")
+      .replace(/\\r/g, "\n")
+
+      // Normal line endings
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+
+      // Prevent too many blank lines
+      .replace(/\n{3,}/g, "\n\n")
+  );
 }
 
-// Which of the app's three languages a message is written in, sniffed from
-// its script — neither the server's message payload nor the socket events
-// carry the language a given reply came back in, so the text itself is the
-// only thing available to go on.
+function stripToPlainText(content: string): string {
+  if (!content) return "";
+
+  const normalized = normalizeMarkdown(content);
+
+  const p = document.createElement("p");
+  p.innerHTML = normalized;
+
+  return (p.textContent || p.innerText || "")
+    .replace(/#{1,6}\s+/g, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/_(.*?)_/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/^\s*>\s?/gm, "")
+    .trim();
+}
+
 function detectLanguage(text: string): "bn" | "ar" | "en" {
   if (/[ঀ-৿]/.test(text)) return "bn";
   if (/[؀-ۿ]/.test(text)) return "ar";
@@ -26,15 +63,14 @@ const SPEECH_LOCALES: Record<"bn" | "ar" | "en", string> = {
   en: "en-US",
 };
 
-// Picks a BCP-47 locale for the browser's speech synthesizer.
 function detectSpeechLocale(text: string): string {
   return SPEECH_LOCALES[detectLanguage(text)];
 }
 
-// Setting utterance.lang alone doesn't guarantee a matching voice — many
-// browsers just fall back to whatever their default voice is regardless.
-// Explicitly picking a real installed voice for the language gets a much
-// more native-sounding read instead of a generic/robotic fallback.
+/* =========================================================
+   SPEECH VOICE
+========================================================= */
+
 let cachedVoices: SpeechSynthesisVoice[] = [];
 
 function refreshVoiceCache() {
@@ -45,108 +81,156 @@ function refreshVoiceCache() {
 
 if (speechSupported) {
   refreshVoiceCache();
-  // Voice lists load asynchronously in most browsers — they can be empty
-  // on the very first call, so re-cache once the real list is ready.
   window.speechSynthesis.onvoiceschanged = refreshVoiceCache;
 }
 
-// Wraps the text in [start, end) — offsets into the *plain-text* version
-// of `root`'s content — in a highlight <mark>, so the currently-spoken
-// word can be highlighted even though the bubble's actual content is
-// rendered HTML (paragraphs, bold, lists, ...) rather than flat text.
-// Rebuilds the text-node map fresh each call since the previous
-// highlight's DOM surgery (see clearSpeechHighlight) invalidates any
-// cached one.
+function pickVoice(locale: string): SpeechSynthesisVoice | undefined {
+  if (cachedVoices.length === 0) {
+    refreshVoiceCache();
+  }
+
+  const prefix = locale.split("-")[0].toLowerCase();
+
+  const exact = cachedVoices.find(
+    (voice) => voice.lang.toLowerCase() === locale.toLowerCase(),
+  );
+
+  if (exact) return exact;
+
+  const sameLanguage = cachedVoices.filter((voice) =>
+    voice.lang.toLowerCase().startsWith(prefix),
+  );
+
+  if (sameLanguage.length === 0) {
+    return undefined;
+  }
+
+  return sameLanguage.find((voice) => voice.localService) ?? sameLanguage[0];
+}
+
+/* =========================================================
+   SPEECH HIGHLIGHT
+========================================================= */
+
 function highlightSpeechRange(root: HTMLElement, start: number, end: number) {
   clearSpeechHighlight(root);
+
   if (end <= start) return;
 
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+
   let offset = 0;
   let node: Node | null;
+
   while ((node = walker.nextNode())) {
     const text = node as Text;
+
     const nodeStart = offset;
     const nodeEnd = offset + text.data.length;
+
     offset = nodeEnd;
-    if (nodeEnd <= start || nodeStart >= end) continue;
+
+    if (nodeEnd <= start || nodeStart >= end) {
+      continue;
+    }
 
     const localStart = Math.max(0, start - nodeStart);
+
     const localEnd = Math.min(text.data.length, end - nodeStart);
+
     if (localStart >= localEnd) continue;
 
     try {
       const range = document.createRange();
+
       range.setStart(text, localStart);
       range.setEnd(text, localEnd);
+
       const mark = document.createElement("mark");
+
       mark.className = "speech-highlight";
+
       range.surroundContents(mark);
     } catch {
-      // A range that doesn't cleanly fit inside one text node (rare, at
-      // element boundaries) — skip highlighting that fragment rather
-      // than crash the read-aloud flow over a cosmetic detail.
+      // Ignore highlight error
     }
   }
 }
 
 function clearSpeechHighlight(root: HTMLElement) {
   const marks = root.querySelectorAll("mark.speech-highlight");
+
   marks.forEach((mark) => {
     const parent = mark.parentNode;
+
     if (!parent) return;
+
     while (mark.firstChild) {
       parent.insertBefore(mark.firstChild, mark);
     }
+
     parent.removeChild(mark);
   });
 }
 
-function pickVoice(locale: string): SpeechSynthesisVoice | undefined {
-  if (cachedVoices.length === 0) refreshVoiceCache();
-  const prefix = locale.split("-")[0].toLowerCase();
-
-  const exact = cachedVoices.find(
-    (v) => v.lang.toLowerCase() === locale.toLowerCase(),
-  );
-  if (exact) return exact;
-
-  const sameLanguage = cachedVoices.filter((v) =>
-    v.lang.toLowerCase().startsWith(prefix),
-  );
-  if (sameLanguage.length === 0) return undefined;
-
-  // Prefer an on-device voice — usually higher quality and lower latency
-  // than a remote/network voice.
-  return sameLanguage.find((v) => v.localService) ?? sameLanguage[0];
-}
+/* =========================================================
+   IMAGE
+========================================================= */
 
 const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "";
 
 function makePlaceholder(letter: string, color: string): string {
-  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='${encodeURIComponent(color)}'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='13' font-weight='bold' font-family='system-ui'%3E${encodeURIComponent(letter)}%3C/text%3E%3C/svg%3E`;
+  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='${encodeURIComponent(
+    color,
+  )}'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='13' font-weight='bold' font-family='system-ui'%3E${encodeURIComponent(
+    letter,
+  )}%3C/text%3E%3C/svg%3E`;
 }
 
 const AI_PLACEHOLDER = makePlaceholder("A", "#a78bfa");
+
 const FARMER_PLACEHOLDER = makePlaceholder("F", "#10b981");
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 interface MessageBubbleProps {
   message: MessageResponse;
   isOwn: boolean;
 }
 
+/* =========================================================
+   TIME
+========================================================= */
+
 function formatTime(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
+
   const diffMs = now.getTime() - date.getTime();
+
   const diffMins = Math.floor(diffMs / 60000);
+
   const diffHours = Math.floor(diffMs / 3600000);
+
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffMins < 1) {
+    return "Just now";
+  }
+
+  if (diffMins < 60) {
+    return `${diffMins}m ago`;
+  }
+
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+
+  if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  }
 
   return date.toLocaleDateString("en-US", {
     month: "short",
@@ -156,24 +240,39 @@ function formatTime(dateString: string): string {
   });
 }
 
+/* =========================================================
+   SENDER IMAGE
+========================================================= */
+
 function getSenderImage(message: MessageResponse): string | null {
   if (message.user?.images) {
     return `${IMAGE_BASE_URL}/${message.user.images}`;
   }
+
   if (message.farmer?.base_image) {
     return `${IMAGE_BASE_URL}/${message.farmer.base_image}`;
   }
+
   return null;
 }
+
+/* =========================================================
+   CONTENT VALIDATION
+========================================================= */
 
 function hasVisibleContent(messageText: string): boolean {
   return (
     String(messageText ?? "")
       .replace(/<[^>]*>/g, "")
       .replace(/&nbsp;/g, " ")
+      .replace(/[#*_>`~\-|]/g, "")
       .trim().length > 0
   );
 }
+
+/* =========================================================
+   COMPONENT
+========================================================= */
 
 export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
   if (!hasVisibleContent(message.message)) {
@@ -181,123 +280,165 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
   }
 
   const isAI = message.sender_type === "ai_agent";
+
   const senderImage = getSenderImage(message);
+
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const cursorRef = useRef<HTMLSpanElement | null>(null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  // Sniffed from the message's own text (see detectLanguage) since nothing
-  // in the payload records which language a reply came back in. Tags the
-  // rendered content below so assistive tech reads it with the right
-  // pronunciation. Stripped of markup first — the raw message can be HTML,
-  // whose Latin tag names would otherwise outvote the actual text.
-  const contentLanguage = useMemo(
-    () => detectLanguage(stripToPlainText(message.message)),
-    [message.message],
-  );
-  const [copied, setCopied] = useState(false);
+
   const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const [copied, setCopied] = useState(false);
+
+  /* =========================================================
+     MARKDOWN CONTENT
+  ========================================================= */
+
+  const markdownContent = useMemo(
+    () => normalizeMarkdown(message.message || ""),
+    [message.message],
+  );
+
+  const contentLanguage = useMemo(
+    () => detectLanguage(stripToPlainText(markdownContent)),
+    [markdownContent],
+  );
+
+  /* =========================================================
+     COPY
+  ========================================================= */
+
   const handleCopy = async () => {
-    // The message is stored as HTML; copy what the user actually sees
-    // rather than the markup around it.
-    const text = stripToPlainText(message.message);
+    const text = stripToPlainText(markdownContent);
+
     if (!text) return;
 
     try {
-      // navigator.clipboard is gated behind a secure context, so it's
-      // simply absent when the app is opened over plain http on a LAN
-      // address (a phone pointed at the dev server, most often). Falling
-      // back to the old execCommand path keeps copy working there instead
-      // of failing silently on exactly the devices it gets tested on.
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
       } else {
         const helper = document.createElement("textarea");
+
         helper.value = text;
-        // Kept off-screen and non-focusable-looking so the page doesn't
-        // visibly jump while the selection is made.
+
         helper.setAttribute("readonly", "");
+
         helper.style.position = "fixed";
+
         helper.style.top = "-9999px";
+
         document.body.appendChild(helper);
+
         helper.select();
+
         document.execCommand("copy");
+
         document.body.removeChild(helper);
       }
 
       setCopied(true);
-      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
+
       copiedTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Clipboard access can be refused outright (permissions policy, a
-      // hardened browser). Nothing useful to recover with, and a thrown
-      // error here would take the bubble down, so leave the icon unchanged
-      // — the absence of the tick is the signal that it didn't take.
+      // Ignore clipboard failure
     }
   };
 
   useEffect(() => {
     return () => {
-      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
     };
   }, []);
+
+  /* =========================================================
+     SPEECH
+  ========================================================= */
 
   const toggleSpeak = () => {
     if (!speechSupported) return;
 
     if (isSpeaking) {
       window.speechSynthesis.cancel();
+
       setIsSpeaking(false);
-      if (contentRef.current) clearSpeechHighlight(contentRef.current);
+
+      if (contentRef.current) {
+        clearSpeechHighlight(contentRef.current);
+      }
+
       return;
     }
 
-    // Stop whatever else (another bubble) is currently reading — the
-    // synthesizer is a single global queue, not per-element.
     window.speechSynthesis.cancel();
 
-    const text = stripToPlainText(message.message || "");
+    const text = stripToPlainText(markdownContent);
+
     if (!text) return;
 
     const locale = detectSpeechLocale(text);
+
     const voice = pickVoice(locale);
 
     const utterance = new SpeechSynthesisUtterance(text);
+
     utterance.lang = voice?.lang ?? locale;
-    if (voice) utterance.voice = voice;
-    utterance.onstart = () => setIsSpeaking(true);
+
+    if (voice) {
+      utterance.voice = voice;
+    }
+
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+    };
+
     utterance.onend = () => {
       setIsSpeaking(false);
-      if (contentRef.current) clearSpeechHighlight(contentRef.current);
+
+      if (contentRef.current) {
+        clearSpeechHighlight(contentRef.current);
+      }
     };
+
     utterance.onerror = () => {
       setIsSpeaking(false);
-      if (contentRef.current) clearSpeechHighlight(contentRef.current);
+
+      if (contentRef.current) {
+        clearSpeechHighlight(contentRef.current);
+      }
     };
+
     utterance.onboundary = (event) => {
-      // Only word boundaries — "sentence" events also fire in some
-      // browsers and would highlight far more than the spoken word.
-      // (Some engines omit `name` entirely; treat that as "word" too
-      // rather than skip highlighting altogether.)
-      if (event.name && event.name !== "word") return;
+      if (event.name && event.name !== "word") {
+        return;
+      }
+
       const el = contentRef.current;
+
       if (!el) return;
 
       const start = event.charIndex;
-      // charLength isn't supported everywhere — fall back to scanning
-      // for the next word-breaking character in the same plain text
-      // that was actually handed to the utterance.
+
       const end =
         typeof event.charLength === "number" && event.charLength > 0
           ? start + event.charLength
           : (() => {
               const rest = text.slice(start);
+
               const match = rest.match(/\s|$/);
+
               return start + (match ? match.index! : rest.length);
             })();
 
       highlightSpeechRange(el, start, end);
     };
+
     window.speechSynthesis.speak(utterance);
   };
 
@@ -305,61 +446,20 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     return () => {
       if (isSpeaking) {
         window.speechSynthesis.cancel();
-        if (contentRef.current) clearSpeechHighlight(contentRef.current);
+
+        if (contentRef.current) {
+          clearSpeechHighlight(contentRef.current);
+        }
       }
     };
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
+  /* =========================================================
+     AVATAR
+  ========================================================= */
 
-    const next = message.message || "";
-
-    if (message.streaming) {
-      // Drop the trailing caret before diffing so it isn't counted as
-      // rendered text, then re-append it after the new chunk.
-      if (cursorRef.current && cursorRef.current.parentNode === el) {
-        el.removeChild(cursorRef.current);
-      }
-
-      const prev = el.textContent || "";
-      if (next !== prev) {
-        if (next.startsWith(prev)) {
-          const suffix = next.slice(prev.length);
-          if (suffix) {
-            // Wrap just the newly-arrived chunk so it fades/lifts into
-            // place, Claude-style, instead of popping in instantly.
-            const span = document.createElement("span");
-            span.className = "token-fade-in";
-            span.textContent = suffix;
-            el.appendChild(span);
-          }
-        } else {
-          el.textContent = next;
-        }
-      }
-
-      const cursor = document.createElement("span");
-      cursor.className = "stream-cursor";
-      cursor.setAttribute("aria-hidden", "true");
-      el.appendChild(cursor);
-      cursorRef.current = cursor;
-      return;
-    }
-
-    cursorRef.current = null;
-    if (/<[^>]+>/.test(next)) {
-      el.innerHTML = next;
-    } else {
-      el.textContent = next;
-    }
-  }, [message.id, message.message, message.streaming]);
-
-  // Rendered in one of two places depending on screen width — outside the
-  // bubble on desktop, inside its header on phones — so it's built once
-  // here rather than duplicated at both call sites.
   const avatar = senderImage ? (
     <img
       src={senderImage}
@@ -382,16 +482,20 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     </div>
   );
 
+  /* =========================================================
+     UI
+  ========================================================= */
+
   return (
     <div
-      className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-3 animate-fade-in-up`}
+      className={`flex ${
+        isOwn ? "justify-end" : "justify-start"
+      } mb-3 animate-fade-in-up`}
     >
-      {/* Desktop only: the avatar sits in its own gutter beside the bubble.
-          On a phone that gutter costs width the message text needs, so
-          there the avatar moves inside the card's header instead. */}
       {!isOwn && (
         <div className="hidden sm:block flex-shrink-0 mr-2 mt-1">{avatar}</div>
       )}
+
       <div
         className={`max-w-[92%] sm:max-w-[80%] md:max-w-[65%] rounded-2xl px-4 py-2.5 shadow-sm ${
           isOwn
@@ -409,39 +513,170 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
         }}
       >
         {!isOwn && (
-          // The card's header line: on phones it carries the avatar next to
-          // the name, since the avatar has no gutter to live in there. From
-          // sm up the avatar is outside the card again, so only the name is
-          // left here — which is what this header has always shown.
           <div className="flex items-center gap-2 mb-1">
             <span className="sm:hidden flex-shrink-0">{avatar}</span>
+
             <span
               dir="auto"
-              className={`text-xs font-semibold ${isAI ? "text-purple-600" : "text-emerald-600"}`}
+              className={`text-xs font-semibold ${
+                isAI ? "text-purple-600" : "text-emerald-600"
+              }`}
             >
               {message.sender_name}
             </span>
           </div>
         )}
-        {/* dir="auto" rather than a hardcoded direction: the browser picks
-            the direction from the first strong directional character, so an
-            Arabic reply lays out right-to-left (and its punctuation lands on
-            the correct side) while Bengali and English stay left-to-right,
-            with no language field on the message to consult. lang is set
-            from the same script sniffing the speech synthesizer uses, so
-            screen readers pronounce the text with the right phonetics
-            instead of reading Bengali and Arabic as English. */}
+
+        {/* =====================================================
+            MESSAGE CONTENT
+            Markdown renders during streaming + after streaming
+        ===================================================== */}
+
         <div
+          ref={contentRef}
           className="text-sm ai-message-content"
           dir="auto"
           lang={contentLanguage}
         >
-          <div ref={contentRef} />
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw, rehypeSanitize]}
+            components={{
+              p: ({ children }) => (
+                <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>
+              ),
+
+              strong: ({ children }) => (
+                <strong className="font-bold">{children}</strong>
+              ),
+
+              em: ({ children }) => <em className="italic">{children}</em>,
+
+              h1: ({ children }) => (
+                <h1 className="text-xl font-bold mt-3 mb-2">{children}</h1>
+              ),
+
+              h2: ({ children }) => (
+                <h2 className="text-lg font-bold mt-3 mb-2">{children}</h2>
+              ),
+
+              h3: ({ children }) => (
+                <h3 className="text-base font-semibold mt-2 mb-1">
+                  {children}
+                </h3>
+              ),
+
+              h4: ({ children }) => (
+                <h4 className="text-sm font-semibold mt-2 mb-1">{children}</h4>
+              ),
+
+              ul: ({ children }) => (
+                <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>
+              ),
+
+              ol: ({ children }) => (
+                <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>
+              ),
+
+              li: ({ children }) => (
+                <li className="leading-relaxed">{children}</li>
+              ),
+
+              blockquote: ({ children }) => (
+                <blockquote className="border-l-4 border-purple-300 pl-3 my-2 italic text-gray-600">
+                  {children}
+                </blockquote>
+              ),
+
+              a: ({ href, children }) => (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-purple-600 underline break-words"
+                >
+                  {children}
+                </a>
+              ),
+
+              code: ({ children, className, ...props }) => {
+                const isBlock = Boolean(className);
+
+                if (!isBlock) {
+                  return (
+                    <code
+                      className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-[13px]"
+                      {...props}
+                    >
+                      {children}
+                    </code>
+                  );
+                }
+
+                return (
+                  <code className={className} {...props}>
+                    {children}
+                  </code>
+                );
+              },
+
+              pre: ({ children }) => (
+                <pre className="bg-gray-900 text-gray-100 rounded-lg p-3 my-2 overflow-x-auto text-xs whitespace-pre-wrap break-words">
+                  {children}
+                </pre>
+              ),
+
+              table: ({ children }) => (
+                <div className="overflow-x-auto my-3">
+                  <table className="min-w-full border-collapse border border-gray-300 text-sm">
+                    {children}
+                  </table>
+                </div>
+              ),
+
+              thead: ({ children }) => (
+                <thead className="bg-gray-100">{children}</thead>
+              ),
+
+              tbody: ({ children }) => <tbody>{children}</tbody>,
+
+              tr: ({ children }) => <tr>{children}</tr>,
+
+              th: ({ children }) => (
+                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                  {children}
+                </th>
+              ),
+
+              td: ({ children }) => (
+                <td className="border border-gray-300 px-3 py-2 align-top">
+                  {children}
+                </td>
+              ),
+
+              hr: () => <hr className="my-3 border-gray-200" />,
+            }}
+          >
+            {markdownContent}
+          </ReactMarkdown>
+
+          {/* Streaming cursor only */}
+          {message.streaming && (
+            <span className="stream-cursor" aria-hidden="true" />
+          )}
         </div>
+
+        {/* =====================================================
+            FOOTER
+        ===================================================== */}
+
         <div
-          className={`flex items-center gap-1.5 mt-1.5 ${isOwn ? "text-white/70" : "text-gray-400"}`}
+          className={`flex items-center gap-1.5 mt-1.5 ${
+            isOwn ? "text-white/70" : "text-gray-400"
+          }`}
         >
           <span className="text-[10px]">{formatTime(message.created_at)}</span>
+
           {speechSupported && !message.streaming && (
             <button
               type="button"
@@ -488,6 +723,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
               )}
             </button>
           )}
+
           {!message.streaming && (
             <button
               type="button"
