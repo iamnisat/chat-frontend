@@ -219,10 +219,6 @@ function ChatContent() {
     }
   }, [userData?.token, userData?.farmer_id]);
 
-  const openCreateThreadDialog = useCallback(() => {
-    setShowThreadTypeSelector(true);
-  }, []);
-
   const openCropSelector = useCallback(() => {
     setShowThreadTypeSelector(false);
     setSelectedCropId(null);
