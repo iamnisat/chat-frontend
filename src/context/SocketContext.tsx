@@ -1,192 +1,3 @@
-// import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode } from "react";
-// import { io, type Socket } from "socket.io-client";
-// import type { UserPayload, ThreadModule } from "../types";
-
-// interface SocketContextType {
-//   socket: Socket | null;
-//   isConnected: boolean;
-//   isReconnecting: boolean;
-//   socketId: string | null;
-//   joinUser: (payload: UserPayload) => Promise<boolean>;
-//   joinThread: (threadModuleId: number) => Promise<boolean>;
-//   leaveThread: (threadModuleId: number) => Promise<boolean>;
-//   createThread: (name: string) => Promise<{ success: boolean; data?: ThreadModule; message?: string }>;
-//   deleteThread: (threadModuleId: number) => Promise<{ success: boolean; message?: string }>;
-//   listThreads: () => Promise<{ success: boolean; data?: ThreadModule[]; message?: string }>;
-// }
-
-// const SocketContext = createContext<SocketContextType | undefined>(undefined);
-
-// const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
-
-// export function SocketProvider({ children, userPayload }: { children: ReactNode; userPayload?: UserPayload }) {
-//   const [socket, setSocket] = useState<Socket | null>(null);
-//   const [isConnected, setIsConnected] = useState(false);
-//   const [isReconnecting, setIsReconnecting] = useState(false);
-//   const [socketId, setSocketId] = useState<string | null>(null);
-//   const socketRef = useRef<Socket | null>(null);
-//   const userPayloadRef = useRef(userPayload);
-//   userPayloadRef.current = userPayload;
-
-//   useEffect(() => {
-//
-
-//     const IS_DEV = import.meta.env.VITE_APP_ENV !== "production";
-//
-
-//     const newSocket = io(SOCKET_URL, {
-//       path: "/socket.io",
-//       transports: ["polling"],
-//       reconnection: true,
-//       reconnectionAttempts: 10,
-//       reconnectionDelay: 1000,
-//       reconnectionDelayMax: 10000,
-//     });
-
-//     socketRef.current = newSocket;
-//     setSocket(newSocket);
-
-//     newSocket.on("connect", () => {
-//
-//       setIsConnected(true);
-//       setIsReconnecting(false);
-//       setSocketId(newSocket.id || null);
-
-//       const payload = userPayloadRef.current;
-//       if (payload) {
-//         newSocket.emit("user:join", payload, (response: { success: boolean; message?: string }) => {
-//
-//         });
-//       }
-//     });
-
-//     newSocket.on("disconnect", (reason) => {
-//
-//       setIsConnected(false);
-//       setSocketId(null);
-//     });
-
-//     newSocket.on("reconnect_attempt", (attempt) => {
-//
-//       setIsReconnecting(true);
-//       setIsConnected(false);
-//     });
-
-//     newSocket.on("reconnect", (attempt) => {
-//
-//       setIsConnected(true);
-//       setIsReconnecting(false);
-//       setSocketId(newSocket.id || null);
-
-//       const payload = userPayloadRef.current;
-//       if (payload) {
-//         newSocket.emit("user:join", payload);
-//       }
-//     });
-
-//     newSocket.on("reconnect_failed", () => {
-//
-//       setIsReconnecting(false);
-//       setIsConnected(false);
-//     });
-
-//     newSocket.on("connect_error", (err) => {
-//
-//     });
-
-//     return () => {
-//
-//       newSocket.disconnect();
-//       socketRef.current = null;
-//     };
-//   }, []);
-
-//   const joinUser = (payload: UserPayload): Promise<boolean> => {
-//     return new Promise((resolve) => {
-//       if (!socketRef.current) {
-//         resolve(false);
-//         return;
-//       }
-//       socketRef.current.emit("user:join", payload, (response: { success: boolean; message?: string }) => {
-//         resolve(response.success);
-//       });
-//     });
-//   };
-
-//   const joinThread = (threadModuleId: number): Promise<boolean> => {
-//     return new Promise((resolve) => {
-//       if (!socketRef.current) {
-//         resolve(false);
-//         return;
-//       }
-//       socketRef.current.emit("thread:join", { thread_module_id: threadModuleId }, (response: { success: boolean; message?: string }) => {
-//         resolve(response.success);
-//       });
-//     });
-//   };
-
-//   const leaveThread = (threadModuleId: number): Promise<boolean> => {
-//     return new Promise((resolve) => {
-//       if (!socketRef.current) {
-//         resolve(false);
-//         return;
-//       }
-//       socketRef.current.emit("thread:leave", { thread_module_id: threadModuleId }, (response: { success: boolean; message?: string }) => {
-//         resolve(response.success);
-//       });
-//     });
-//   };
-
-//   const createThread = (name: string): Promise<{ success: boolean; data?: ThreadModule; message?: string }> => {
-//     return new Promise((resolve) => {
-//       if (!socketRef.current) {
-//         resolve({ success: false, message: "Not connected" });
-//         return;
-//       }
-//       socketRef.current.emit("thread:create", { name }, (response: { success: boolean; message?: string; data?: ThreadModule }) => {
-//         resolve(response);
-//       });
-//     });
-//   };
-
-//   const deleteThread = useCallback((threadModuleId: number): Promise<{ success: boolean; message?: string }> => {
-//     return new Promise((resolve) => {
-//       if (!socketRef.current) {
-//         resolve({ success: false, message: "Not connected" });
-//         return;
-//       }
-//       socketRef.current.emit("thread:delete", { thread_module_id: threadModuleId }, (response: { success: boolean; message?: string }) => {
-//         resolve(response);
-//       });
-//     });
-//   }, []);
-
-//   const listThreads = useCallback((): Promise<{ success: boolean; data?: ThreadModule[]; message?: string }> => {
-//     return new Promise((resolve) => {
-//       if (!socketRef.current) {
-//         resolve({ success: false, message: "Not connected" });
-//         return;
-//       }
-//       socketRef.current.emit("thread:list", (response: { success: boolean; data?: ThreadModule[]; message?: string }) => {
-//         resolve(response);
-//       });
-//     });
-//   }, []);
-
-//   return (
-//     <SocketContext.Provider value={{ socket, isConnected, isReconnecting, socketId, joinUser, joinThread, leaveThread, createThread, deleteThread, listThreads }}>
-//       {children}
-//     </SocketContext.Provider>
-//   );
-// }
-
-// export function useSocketContext() {
-//   const context = useContext(SocketContext);
-//   if (!context) {
-//     throw new Error("useSocketContext must be used within a SocketProvider");
-//   }
-//   return context;
-// }
 import {
   createContext,
   useCallback,
@@ -286,19 +97,20 @@ interface SocketContextType {
   listThreads: () => Promise<ThreadListResponse>;
 
   subscribeMessageStream: (
-    callback: (data: MessageStreamPayload) => void
+    callback: (data: MessageStreamPayload) => void,
   ) => () => void;
 
   subscribeNewMessage: (
-    callback: (data: NewMessagePayload) => void
+    callback: (data: NewMessagePayload) => void,
   ) => () => void;
 
   subscribeConversationNewMessage: (
-    callback: (data: ConversationNewMessagePayload) => void
+    callback: (data: ConversationNewMessagePayload) => void,
   ) => () => void;
 }
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL || "https://deploy.farminsight.dev";
 export function SocketProvider({
   children,
   userPayload,
@@ -370,7 +182,7 @@ export function SocketProvider({
           {
             thread_module_id: threadModuleId,
           },
-          (_response: SocketResponse) => {}
+          (_response: SocketResponse) => {},
         );
       });
     };
@@ -474,7 +286,7 @@ export function SocketProvider({
           }
 
           resolve(response?.success ?? false);
-        }
+        },
       );
     });
   }, []);
@@ -499,11 +311,11 @@ export function SocketProvider({
           },
           (response: SocketResponse) => {
             resolve(response?.success ?? false);
-          }
+          },
         );
       });
     },
-    []
+    [],
   );
 
   const createThread = useCallback(
@@ -527,11 +339,11 @@ export function SocketProvider({
           },
           (response: ThreadCreateResponse) => {
             resolve(response);
-          }
+          },
         );
       });
     },
-    []
+    [],
   );
 
   const deleteThread = useCallback(
@@ -557,11 +369,11 @@ export function SocketProvider({
           },
           (response: SocketResponse) => {
             resolve(response);
-          }
+          },
         );
       });
     },
-    []
+    [],
   );
 
   const listThreads = useCallback((): Promise<ThreadListResponse> => {
@@ -589,7 +401,7 @@ export function SocketProvider({
 
       if (!currentSocket) {
         console.warn(
-          "[Socket] Cannot subscribe message:stream. Socket unavailable."
+          "[Socket] Cannot subscribe message:stream. Socket unavailable.",
         );
 
         return () => {};
@@ -601,7 +413,7 @@ export function SocketProvider({
         currentSocket.off("message:stream", callback);
       };
     },
-    []
+    [],
   );
   const subscribeNewMessage = useCallback(
     (callback: (data: NewMessagePayload) => void) => {
@@ -609,7 +421,7 @@ export function SocketProvider({
 
       if (!currentSocket) {
         console.warn(
-          "[Socket] Cannot subscribe message:new. Socket unavailable."
+          "[Socket] Cannot subscribe message:new. Socket unavailable.",
         );
 
         return () => {};
@@ -621,7 +433,7 @@ export function SocketProvider({
         currentSocket.off("message:new", callback);
       };
     },
-    []
+    [],
   );
 
   const subscribeConversationNewMessage = useCallback(
@@ -638,7 +450,7 @@ export function SocketProvider({
         currentSocket.off("conversation:new-message", callback);
       };
     },
-    []
+    [],
   );
 
   return (
