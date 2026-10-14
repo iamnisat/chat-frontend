@@ -111,6 +111,7 @@ interface SocketContextType {
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL || "https://deploy.farminsight.dev";
+console.log("🚀 ~ SOCKET_URL:", SOCKET_URL);
 export function SocketProvider({
   children,
   userPayload,
@@ -136,15 +137,10 @@ export function SocketProvider({
     const newSocket = io(SOCKET_URL, {
       path: "/socket.io",
       transports: ["websocket", "polling"],
-
       reconnection: true,
-
       reconnectionAttempts: 10,
-
       reconnectionDelay: 1000,
-
       reconnectionDelayMax: 10000,
-
       timeout: 20000,
       autoConnect: true,
     });
