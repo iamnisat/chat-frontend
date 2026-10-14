@@ -31,7 +31,7 @@ npm install
 Create a `.env` file:
 
 ```
-VITE_SOCKET_URL=http://localhost:8080
+VITE_SOCKET_URL=http://localhost:8000
 VITE_APP_ENV=development
 ```
 
@@ -66,14 +66,14 @@ docker build -t chat-frontend .
 ### Run Container
 
 ```bash
-docker run -p 8080:8080 -e VITE_SOCKET_URL=https://deploy.farminsight.dev chat-frontend
+docker run -p 8000:8000 -e VITE_SOCKET_URL=https://deploy.farminsight.dev chat-frontend
 ```
 
 ## Environment Variables
 
 | Variable          | Description                          | Default                 |
 | ----------------- | ------------------------------------ | ----------------------- |
-| `VITE_SOCKET_URL` | Backend Socket.IO server URL         | `http://localhost:8080` |
+| `VITE_SOCKET_URL` | Backend Socket.IO server URL         | `http://localhost:8000` |
 | `VITE_APP_ENV`    | Environment (development/production) | `development`           |
 
 ## Project Structure
@@ -129,7 +129,7 @@ This will:
 ```bash
 gcloud run deploy chat-frontend \
   --image=gcr.io/upheld-setting-423215-p7/chat-frontend \
-  --port=8080 \
+  --port=8000 \
   --region=us-central1 \
   --allow-unauthenticated \
   --platform managed
