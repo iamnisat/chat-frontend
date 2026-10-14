@@ -1,5 +1,6 @@
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "https://fusion.aunkur.ai/api/v1";
+// const API_BASE =
+//   import.meta.env.VITE_API_BASE_URL || "https://fusion.aunkur.ai/api/v1";
+const API_BASE = "https://fusion.aunkur.ai/api/v1";
 
 export async function fetchConversations(token: string) {
   const res = await fetch(`${API_BASE}/messages/conversations`, {

@@ -10,7 +10,8 @@ import { SocketProvider, useSocketContext } from "../context/SocketContext";
 import { useChat } from "../hooks/useChat.ts";
 import type { LanguageType, ThreadModule, UserPayload } from "../types";
 
-const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "";
+// const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || "https://storage.googleapis.com/aunkur/farmer-profile";
+const IMAGE_BASE_URL = "https://storage.googleapis.com/aunkur/farmer-profile";
 const GENERAL_THREAD_NAME = "General";
 const PLACEHOLDER_IMG =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23a78bfa'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='16' font-weight='bold' font-family='system-ui'%3EU%3C/text%3E%3C/svg%3E";
