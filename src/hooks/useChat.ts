@@ -7,7 +7,7 @@ import type { LoginType, MessageResponse, SendMessagePayload } from "../types";
 function normalizeHistoricalMessage(
   raw: Record<string, unknown>,
   currentUserId: string,
-  currentUserType: LoginType
+  currentUserType: LoginType,
 ): MessageResponse {
   const senderType = (
     (raw.sender_type as string) ??
@@ -88,12 +88,12 @@ function normalizeHistoricalMessage(
     (resolvedSenderType === "ai_agent"
       ? "Aunkur AI"
       : resolvedSenderType === "farmer"
-      ? normalizedFarmerId?.split("_")[0] ?? "Farmer"
-      : `User ${normalizedUserId ?? "unknown"}`);
+        ? (normalizedFarmerId?.split("_")[0] ?? "Farmer")
+        : `User ${normalizedUserId ?? "unknown"}`);
 
   const message: MessageResponse = {
     id: String(
-      raw.id ?? `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      raw.id ?? `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     ),
     thread_module_id: (raw.thread_module_id as number) ?? 0,
     message: ((raw.message as string) ??
@@ -116,7 +116,7 @@ export function useChat(
   threadModuleId: number | null,
   currentUserId?: string,
   currentUserType?: LoginType,
-  token?: string
+  token?: string,
 ) {
   const { socket, isConnected, subscribeMessageStream } = useSocketContext();
   const [messages, setMessages] = useState<MessageResponse[]>([]);
@@ -135,7 +135,7 @@ export function useChat(
   const pageRef = useRef(1);
   const isLoadingMoreRef = useRef(false);
   const typingSafetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+    null,
   );
 
   const scrollToBottom = useCallback(() => {
@@ -172,7 +172,7 @@ export function useChat(
             return {
               id: String(
                 msg.id ??
-                  `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+                  `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
               ),
               thread_module_id: threadModuleId,
               message: (msg.message as string) ?? "",
@@ -187,7 +187,7 @@ export function useChat(
               user: senderUser,
               farmer: senderFarmer,
             };
-          }
+          },
         );
 
         pageRef.current = nextPage;
@@ -242,7 +242,7 @@ export function useChat(
                   msg.id ??
                     `hist_${Date.now()}_${Math.random()
                       .toString(36)
-                      .slice(2, 8)}`
+                      .slice(2, 8)}`,
                 ),
                 thread_module_id: threadModuleId,
                 message: (msg.message as string) ?? "",
@@ -258,7 +258,7 @@ export function useChat(
                 user: senderUser,
                 farmer: senderFarmer,
               };
-            }
+            },
           );
           pageRef.current = 1;
           setHasMorePages(json.paginatorInfo?.hasMorePages ?? false);
@@ -284,15 +284,15 @@ export function useChat(
                     normalizeHistoricalMessage(
                       msg as unknown as Record<string, unknown>,
                       currentUserId,
-                      currentUserType
-                    )
+                      currentUserType,
+                    ),
                   )
                 : response.data;
             setMessages(normalized);
             setTimeout(scrollToBottom, 50);
           }
           setIsLoadingInitial(false);
-        }
+        },
       );
     } else {
       setIsLoadingInitial(false);
@@ -317,11 +317,10 @@ export function useChat(
             data.stream_data?.messageId ??
             data.stream_data?.id ??
             data.stream_data?.client_id ??
-            `stream_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+            `stream_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         );
 
         const stream = data.stream_data;
-        console.log("stream: ", stream);
         const eventType = (stream?.type ?? data.type ?? "") as string;
         const streamStatus = (stream?.status ?? data.status ?? "") as string;
         // Backends have been observed signalling the "thinking" phase via
@@ -410,7 +409,7 @@ export function useChat(
 
             if (!hasContent) {
               return prev.filter(
-                (m) => !m.streaming && !String(m.id).endsWith("_thinking")
+                (m) => !m.streaming && !String(m.id).endsWith("_thinking"),
               );
             }
 
@@ -427,7 +426,7 @@ export function useChat(
               streaming: false,
             };
             const filtered = prev.filter(
-              (m) => !m.streaming && !String(m.id).endsWith("_thinking")
+              (m) => !m.streaming && !String(m.id).endsWith("_thinking"),
             );
             return [...filtered, finalizedMsg];
           }
@@ -438,11 +437,11 @@ export function useChat(
             eventType === "status"
           ) {
             const withoutThinking = prev.filter(
-              (m) => !String(m.id).endsWith("_thinking")
+              (m) => !String(m.id).endsWith("_thinking"),
             );
 
             const streamingIndex = withoutThinking.findIndex(
-              (m) => m.streaming && m.thread_module_id === threadModuleId
+              (m) => m.streaming && m.thread_module_id === threadModuleId,
             );
 
             if (streamingIndex === -1) {
@@ -540,13 +539,13 @@ export function useChat(
             raw.farmer_id ??
             raw.farmerId ??
             (resolvedSenderType === "farmer"
-              ? raw.sender_id ?? raw.senderId
+              ? (raw.sender_id ?? raw.senderId)
               : null);
           const rawUserId =
             raw.user_id ??
             raw.userId ??
             (resolvedSenderType === "user"
-              ? raw.sender_id ?? raw.senderId
+              ? (raw.sender_id ?? raw.senderId)
               : null);
 
           const normalizedFarmerId =
@@ -555,16 +554,16 @@ export function useChat(
             currentUserId
               ? currentUserId
               : rawFarmerId != null
-              ? String(rawFarmerId)
-              : null;
+                ? String(rawFarmerId)
+                : null;
           const normalizedUserId =
             resolvedSenderType === "user" &&
             currentUserType === "user" &&
             currentUserId
               ? Number(currentUserId)
               : rawUserId != null
-              ? Number(rawUserId)
-              : null;
+                ? Number(rawUserId)
+                : null;
 
           const senderName =
             (raw.sender_name as string) ??
@@ -577,8 +576,8 @@ export function useChat(
             typeof rawCreatedAt === "number"
               ? new Date(rawCreatedAt).toISOString()
               : typeof rawCreatedAt === "string"
-              ? rawCreatedAt
-              : new Date().toISOString();
+                ? rawCreatedAt
+                : new Date().toISOString();
 
           const finalizedMsg: MessageResponse = {
             ...message,
@@ -591,7 +590,7 @@ export function useChat(
           };
 
           const streamingIndex = prev.findIndex(
-            (m) => m.streaming && m.thread_module_id === threadModuleId
+            (m) => m.streaming && m.thread_module_id === threadModuleId,
           );
 
           if (streamingIndex !== -1) {
@@ -669,8 +668,10 @@ export function useChat(
       if (data.thread_module_id === threadModuleId) {
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === data.message_id ? { ...msg, message: data.message } : msg
-          )
+            msg.id === data.message_id
+              ? { ...msg, message: data.message }
+              : msg,
+          ),
         );
       }
     };
@@ -718,7 +719,7 @@ export function useChat(
     (
       payload: Omit<SendMessagePayload, "thread_module_id"> & {
         thread_module_id?: number;
-      }
+      },
     ) => {
       if (!socket || !isConnected || !threadModuleId) return;
 
@@ -744,10 +745,10 @@ export function useChat(
           if (!response.success) {
             setIsAwaitingResponse(false);
           }
-        }
+        },
       );
     },
-    [socket, isConnected, threadModuleId]
+    [socket, isConnected, threadModuleId],
   );
 
   const markSeen = useCallback(() => {
@@ -765,7 +766,7 @@ export function useChat(
         farmer_id: farmerId,
       });
     },
-    [socket, isConnected, threadModuleId]
+    [socket, isConnected, threadModuleId],
   );
 
   const emitTypingStop = useCallback(
@@ -777,7 +778,7 @@ export function useChat(
         farmer_id: farmerId,
       });
     },
-    [socket, isConnected, threadModuleId]
+    [socket, isConnected, threadModuleId],
   );
 
   return {
