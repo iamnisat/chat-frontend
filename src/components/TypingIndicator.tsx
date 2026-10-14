@@ -56,8 +56,8 @@ export function TypingIndicator({
   return (
     <div className="flex justify-start mb-3 animate-fade-in-up">
       <div
-        className="rounded-2xl rounded-bl-md px-3.5 py-2.5 border border-purple-100 max-w-[85%]"
-        style={{ background: "var(--ai-gradient)" }}
+        className="rounded-2xl rounded-bl-md px-3.5 py-2.5 border border-slate-200 max-w-[85%]"
+        style={{ background: "var(--bubble-reply)" }}
       >
         <div className="flex items-center gap-2.5">
           <div
@@ -88,15 +88,15 @@ export function TypingIndicator({
             )}
             <div className="flex items-end gap-1 flex-shrink-0">
               <span
-                className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-thinking-dot"
+                className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-thinking-dot"
                 style={{ animationDelay: "0ms" }}
               />
               <span
-                className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-thinking-dot"
+                className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-thinking-dot"
                 style={{ animationDelay: "160ms" }}
               />
               <span
-                className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-thinking-dot"
+                className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-thinking-dot"
                 style={{ animationDelay: "320ms" }}
               />
             </div>

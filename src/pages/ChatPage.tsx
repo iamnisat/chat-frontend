@@ -14,7 +14,7 @@ import type { LanguageType, ThreadModule, UserPayload } from "../types";
 const IMAGE_BASE_URL = "https://storage.googleapis.com/aunkur/farmer-profile";
 const GENERAL_THREAD_NAME = "General";
 const PLACEHOLDER_IMG =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23a78bfa'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='16' font-weight='bold' font-family='system-ui'%3EU%3C/text%3E%3C/svg%3E";
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23475569'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='16' font-weight='bold' font-family='system-ui'%3EU%3C/text%3E%3C/svg%3E";
 
 function ChatContent() {
   const navigate = useNavigate();
@@ -277,14 +277,14 @@ function ChatContent() {
         title: "Conversation not created",
         text: "Something went wrong while creating the conversation.",
         icon: "error",
-        confirmButtonColor: "#7c3aed",
+        confirmButtonColor: "#334155",
       });
     } catch (error) {
       await Swal.fire({
         title: "Conversation not created",
         text: error instanceof Error ? error.message : "Please try again.",
         icon: "error",
-        confirmButtonColor: "#7c3aed",
+        confirmButtonColor: "#334155",
       });
     } finally {
       setIsCreatingThread(false);
@@ -318,7 +318,7 @@ function ChatContent() {
         title: "Conversation already exists",
         text: `Opening the existing conversation for ${selectedCropName}.`,
         icon: "info",
-        confirmButtonColor: "#7c3aed",
+        confirmButtonColor: "#334155",
       });
       return;
     }
@@ -341,7 +341,7 @@ function ChatContent() {
         //   title: "Conversation created",
         //   text: `${json.message}`,
         //   icon: "success",
-        //   confirmButtonColor: "#7c3aed",
+        //   confirmButtonColor: "#334155",
         // });
         return;
       }
@@ -350,14 +350,14 @@ function ChatContent() {
       //   title: "Conversation not created",
       //   text: "Something went wrong while creating the conversation.",
       //   icon: "error",
-      //   confirmButtonColor: "#7c3aed",
+      //   confirmButtonColor: "#334155",
       // });
     } catch (error) {
       // await Swal.fire({
       //   title: "Conversation not created",
       //   text: error instanceof Error ? error.message : "Please try again.",
       //   icon: "error",
-      //   confirmButtonColor: "#7c3aed",
+      //   confirmButtonColor: "#334155",
       // });
     } finally {
       setIsCreatingThread(false);
@@ -427,13 +427,13 @@ function ChatContent() {
   return (
     <div className="h-dvh flex flex-col bg-gray-50 safe-x">
       {/* Header */}
-      <header className="bg-white border-b border-purple-100 flex-shrink-0 z-30 safe-top">
+      <header className="bg-white border-b border-slate-100 flex-shrink-0 z-30 safe-top">
         <div className="px-4 py-3 flex items-center justify-between">
           {/* Left: User info */}
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="md:hidden p-2 rounded-xl hover:bg-purple-50 transition-colors text-gray-500 flex-shrink-0"
+              className="md:hidden p-2 rounded-xl hover:bg-slate-50 transition-colors text-gray-500 flex-shrink-0"
             >
               <svg
                 className="w-5 h-5"
@@ -503,9 +503,9 @@ function ChatContent() {
 
         {/* Thread name bar (when thread selected) */}
         {selectedThread && (
-          <div className="px-4 py-2 bg-purple-50/50 border-t border-purple-100/50 flex items-center gap-2">
+          <div className="px-4 py-2 bg-slate-50/50 border-t border-slate-100/50 flex items-center gap-2">
             <svg
-              className="w-4 h-4 text-purple-500 flex-shrink-0"
+              className="w-4 h-4 text-slate-500 flex-shrink-0"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -517,7 +517,7 @@ function ChatContent() {
                 d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"
               />
             </svg>
-            <span className="text-xs font-semibold text-purple-700 truncate">
+            <span className="text-xs font-semibold text-slate-700 truncate">
               {selectedThreadName}
             </span>
           </div>
@@ -535,11 +535,11 @@ function ChatContent() {
         className={`thread-sidebar md:hidden safe-top safe-bottom ${sidebarOpen ? "open" : ""}`}
         style={{ background: "var(--surface)" }}
       >
-        <div className="flex items-center justify-between p-4 border-b border-purple-100">
+        <div className="flex items-center justify-between p-4 border-b border-slate-100">
           <span className="font-bold text-gray-800">Threads</span>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="p-1.5 rounded-lg hover:bg-purple-50 transition-colors text-gray-500"
+            className="p-1.5 rounded-lg hover:bg-slate-50 transition-colors text-gray-500"
           >
             <svg
               className="w-5 h-5"
@@ -576,7 +576,7 @@ function ChatContent() {
 
       {showThreadTypeSelector && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-purple-100">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-slate-100">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800">
                 New Conversation
@@ -594,7 +594,7 @@ function ChatContent() {
               <button
                 type="button"
                 onClick={openCropSelector}
-                className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 px-3 py-4 hover:border-purple-300 hover:bg-purple-50/50 transition text-gray-700"
+                className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 px-3 py-4 hover:border-slate-300 hover:bg-slate-50/50 transition text-gray-700"
               >
                 <span className="text-2xl">🌾</span>
                 <span className="text-sm font-semibold">Crop</span>
@@ -603,7 +603,7 @@ function ChatContent() {
                 type="button"
                 onClick={handleCreateGeneralThread}
                 disabled={isCreatingThread}
-                className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 px-3 py-4 hover:border-purple-300 hover:bg-purple-50/50 transition text-gray-700 disabled:opacity-60"
+                className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 px-3 py-4 hover:border-slate-300 hover:bg-slate-50/50 transition text-gray-700 disabled:opacity-60"
               >
                 <span className="text-2xl">💬</span>
                 <span className="text-sm font-semibold">
@@ -617,7 +617,7 @@ function ChatContent() {
 
       {showCropSelector && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl border border-purple-100">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl border border-slate-100">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800">Select Crop</h3>
               <button
@@ -631,7 +631,7 @@ function ChatContent() {
 
             {isLoadingCrops ? (
               <div className="flex flex-col items-center justify-center gap-3 py-8 text-sm text-gray-500">
-                <div className="h-7 w-7 animate-spin rounded-full border-2 border-purple-200 border-t-purple-600" />
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-600" />
                 <span>Loading crops...</span>
               </div>
             ) : cropOptions.length === 0 ? (
@@ -652,8 +652,8 @@ function ChatContent() {
                     }}
                     className={`w-full text-left rounded-xl border px-3 py-2.5 transition ${
                       selectedCropId === crop.id
-                        ? "border-purple-300 bg-purple-50 text-purple-700"
-                        : "border-gray-200 hover:border-purple-200 hover:bg-purple-50/50 text-gray-700"
+                        ? "border-slate-300 bg-slate-50 text-slate-700"
+                        : "border-gray-200 hover:border-slate-200 hover:bg-slate-50/50 text-gray-700"
                     }`}
                   >
                     {crop.name}
@@ -692,7 +692,7 @@ function ChatContent() {
       {/* Main content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Desktop sidebar */}
-        <div className="hidden md:block w-72 border-r border-purple-100 bg-white flex-shrink-0">
+        <div className="hidden md:block w-72 border-r border-slate-100 bg-white flex-shrink-0">
           {/* <ThreadList
             threads={threads}
             selectedThread={selectedThread}
@@ -751,7 +751,7 @@ function ChatContent() {
             >
               <div className="text-center animate-float">
                 <div
-                  className="w-24 h-24 mx-auto mb-5 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-100"
+                  className="w-24 h-24 mx-auto mb-5 rounded-2xl flex items-center justify-center shadow-lg shadow-slate-100"
                   style={{ background: "var(--own-gradient)" }}
                 >
                   <svg

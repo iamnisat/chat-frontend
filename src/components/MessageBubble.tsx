@@ -188,9 +188,9 @@ function makePlaceholder(letter: string, color: string): string {
   )}%3C/text%3E%3C/svg%3E`;
 }
 
-const AI_PLACEHOLDER = makePlaceholder("A", "#a78bfa");
+const AI_PLACEHOLDER = makePlaceholder("A", "#475569");
 
-const FARMER_PLACEHOLDER = makePlaceholder("F", "#10b981");
+const FARMER_PLACEHOLDER = makePlaceholder("F", "#94a3b8");
 
 /* =========================================================
    TYPES
@@ -476,7 +476,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
       style={{
         background: isAI
           ? "var(--own-gradient)"
-          : "linear-gradient(135deg, #34d399 0%, #10b981 100%)",
+          : "linear-gradient(135deg, #64748b 0%, #94a3b8 100%)",
       }}
     >
       {message.sender_name?.charAt(0).toUpperCase() || "U"}
@@ -502,15 +502,15 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
           isOwn
             ? "text-white rounded-br-md"
             : isAI
-              ? "text-gray-800 rounded-bl-md border border-purple-100"
-              : "text-gray-800 rounded-bl-md border border-green-100"
+              ? "text-gray-800 rounded-bl-md border border-slate-200"
+              : "text-gray-800 rounded-bl-md border border-slate-200"
         }`}
         style={{
           background: isOwn
-            ? "var(--own-gradient)"
+            ? "var(--bubble-send)"
             : isAI
-              ? "var(--ai-gradient)"
-              : "var(--farmer-gradient)",
+              ? "var(--bubble-reply)"
+              : "var(--bubble-reply)",
         }}
       >
         {!isOwn && (
@@ -520,7 +520,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
             <span
               dir="auto"
               className={`text-xs font-semibold ${
-                isAI ? "text-purple-600" : "text-emerald-600"
+                isAI ? "text-slate-600" : "text-slate-600"
               }`}
             >
               {message.sender_name}
@@ -584,7 +584,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
               ),
 
               blockquote: ({ children }) => (
-                <blockquote className="border-l-4 border-purple-300 pl-3 my-2 italic text-gray-600">
+                <blockquote className="border-l-4 border-slate-300 pl-3 my-2 italic text-gray-600">
                   {children}
                 </blockquote>
               ),
@@ -594,7 +594,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-purple-600 underline break-words"
+                  className="text-slate-600 underline break-words"
                 >
                   {children}
                 </a>
@@ -686,8 +686,8 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
                 isOwn
                   ? "hover:bg-white/20"
                   : isSpeaking
-                    ? "text-purple-500"
-                    : "hover:text-purple-500 hover:bg-purple-50"
+                    ? "text-slate-500"
+                    : "hover:text-slate-500 hover:bg-slate-50"
               }`}
               aria-pressed={isSpeaking}
               aria-label={isSpeaking ? "Stop reading aloud" : "Read aloud"}
@@ -733,8 +733,8 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
                 isOwn
                   ? "hover:bg-white/20"
                   : copied
-                    ? "text-purple-500"
-                    : "hover:text-purple-500 hover:bg-purple-50"
+                    ? "text-slate-500"
+                    : "hover:text-slate-500 hover:bg-slate-50"
               }`}
               aria-label={copied ? "Copied" : "Copy message"}
               title={copied ? "Copied" : "Copy message"}

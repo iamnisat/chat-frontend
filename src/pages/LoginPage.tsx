@@ -74,14 +74,14 @@ export function LoginPage() {
       className="min-h-dvh flex items-center justify-center p-4 safe-top safe-bottom safe-x"
       style={{
         background:
-          "linear-gradient(135deg, #f5f3ff 0%, #fdf2f8 50%, #ede9fe 100%)",
+          "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)",
       }}
     >
       <div className="w-full max-w-sm animate-fade-in-up">
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-purple-100/50 border border-purple-100/50 p-8">
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-slate-100/50 border border-slate-100/50 p-8">
           <div className="text-center mb-8">
             <div
-              className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-200"
+              className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-lg shadow-slate-200"
               style={{ background: "var(--own-gradient)" }}
             >
               <svg
@@ -119,7 +119,7 @@ export function LoginPage() {
                 onChange={(e) => setMobile(e.target.value)}
                 placeholder="e.g. (+88) 01799-999-444"
                 required
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-base sm:text-sm focus:outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100 transition-all placeholder:text-gray-300"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-base sm:text-sm focus:outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all placeholder:text-gray-300"
               />
             </div>
 
@@ -137,7 +137,7 @@ export function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 required
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-base sm:text-sm focus:outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100 transition-all placeholder:text-gray-300"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-base sm:text-sm focus:outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all placeholder:text-gray-300"
               />
             </div>
 
@@ -148,7 +148,7 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl text-white font-semibold text-sm shadow-lg shadow-purple-200 hover:shadow-xl hover:shadow-purple-300 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="w-full py-3 rounded-xl text-white font-semibold text-sm shadow-lg shadow-slate-200 hover:shadow-xl hover:shadow-slate-300 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               style={{ background: "var(--own-gradient)" }}
             >
               {loading ? "Signing in..." : "Sign In"}
@@ -156,7 +156,7 @@ export function LoginPage() {
           </form>
         </div>
         <p className="text-center text-xs text-gray-300 mt-6">
-          Powered by AUNKUR
+          Powered by AUNKUR AI
         </p>
       </div>
     </div>

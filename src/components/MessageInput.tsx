@@ -457,7 +457,7 @@ export function MessageInput({
   const hasText = message.trim().length > 0;
 
   return (
-    <div className="border-t border-purple-100 bg-white px-3 sm:px-4 py-3 flex-shrink-0 safe-bottom">
+    <div className="border-t border-slate-100 bg-white px-3 sm:px-4 py-3 flex-shrink-0 safe-bottom">
       <div className="max-w-3xl mx-auto flex items-end gap-1.5 sm:gap-2">
         {/* Language: standalone circular button, badge shows the current code */}
         <div className="relative flex-shrink-0">
@@ -480,7 +480,7 @@ export function MessageInput({
               />
             </svg>
           </div>
-          <span className="pointer-events-none absolute -top-1 -right-1 text-[9px] font-bold text-purple-600 bg-white border border-purple-200 rounded-full px-1 py-px leading-tight shadow-sm">
+          <span className="pointer-events-none absolute -top-1 -right-1 text-[9px] font-bold text-slate-600 bg-white border border-slate-200 rounded-full px-1 py-px leading-tight shadow-sm">
             {language.toUpperCase()}
           </span>
           <select
@@ -543,7 +543,7 @@ export function MessageInput({
         )}
 
         {/* Text box: its own standalone pill, no longer sharing a border with the buttons */}
-        <div className="min-w-0 flex-1 flex items-center bg-gray-50 rounded-3xl border border-gray-200 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-100 transition-all">
+        <div className="min-w-0 flex-1 flex items-center bg-gray-50 rounded-3xl border border-gray-200 focus-within:border-slate-300 focus-within:ring-2 focus-within:ring-slate-100 transition-all">
           <textarea
             ref={textareaRef}
             value={message}

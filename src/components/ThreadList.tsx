@@ -70,7 +70,7 @@ export function ThreadList({
               ref={createButtonRef}
               onClick={onCreateThread}
               disabled={isCreatingThread}
-              className="p-2 rounded-xl hover:bg-purple-50 transition-colors text-purple-500 hover:text-purple-600 disabled:opacity-50"
+              className="p-2 rounded-xl hover:bg-slate-50 transition-colors text-slate-500 hover:text-slate-600 disabled:opacity-50"
               title="New conversation"
             >
               {isCreatingThread ? (
@@ -121,10 +121,10 @@ export function ThreadList({
                 key={index}
                 className="flex items-center gap-3 px-3.5 py-3 rounded-xl animate-pulse"
               >
-                <div className="w-10 h-10 rounded-xl bg-purple-100 flex-shrink-0" />
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex-shrink-0" />
                 <div className="flex-1 min-w-0 space-y-2">
-                  <div className="h-3 w-2/3 rounded bg-purple-100" />
-                  <div className="h-2.5 w-4/5 rounded bg-purple-50" />
+                  <div className="h-3 w-2/3 rounded bg-slate-100" />
+                  <div className="h-2.5 w-4/5 rounded bg-slate-50" />
                 </div>
               </div>
             ))}
@@ -141,7 +141,7 @@ export function ThreadList({
                 onClick={() => onSelectThread(thread.id)}
                 className={`w-full text-left px-3.5 py-3 rounded-xl transition-all duration-200 ${
                   isSelected
-                    ? "bg-white shadow-md shadow-purple-100 scale-[1.02]"
+                    ? "bg-white shadow-md shadow-slate-100 scale-[1.02]"
                     : "hover:bg-white/60 hover:shadow-sm"
                 }`}
                 style={{
@@ -156,12 +156,12 @@ export function ThreadList({
                     style={{
                       background: isSelected
                         ? "var(--own-gradient)"
-                        : "linear-gradient(135deg, #f3e8ff 0%, #ede9fe 100%)",
+                        : "linear-gradient(135deg, #e2e8f0 0%, #f8fafc 100%)",
                     }}
                   >
                     <svg
                       className={`w-5 h-5 ${
-                        isSelected ? "text-white" : "text-purple-400"
+                        isSelected ? "text-white" : "text-slate-400"
                       }`}
                       fill="none"
                       viewBox="0 0 24 24"
@@ -190,7 +190,7 @@ export function ThreadList({
                       <span
                         dir="auto"
                         className={`text-sm font-semibold truncate ${
-                          isSelected ? "text-purple-700" : "text-gray-700"
+                          isSelected ? "text-slate-700" : "text-gray-700"
                         }`}
                       >
                         {thread.name}
@@ -198,7 +198,7 @@ export function ThreadList({
                       {threadMode && (
                         <span
                           className={`text-[11px] font-medium flex-shrink-0 ${
-                            isSelected ? "text-purple-400" : "text-gray-400"
+                            isSelected ? "text-slate-400" : "text-gray-400"
                           }`}
                         >
                           ({threadMode})
