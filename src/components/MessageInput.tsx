@@ -425,12 +425,36 @@ export function MessageInput({
   const handleSend = () => {
     if (isSending) return;
 
-    if (isListening) {
+    if (!message.trim() && isListening) {
       stopListening();
     }
 
     const trimmed = message.trim();
     if (trimmed && trimmed.length <= MAX_CHARS) {
+      // Fully tear down dictation: stop() still delivers a late final
+      // onresult that would re-fill the box with the just-sent text, so
+      // detach handlers and abort, and reset the base/session buffers.
+      shouldKeepListeningRef.current = false;
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = null;
+      }
+      const rec = recognitionRef.current;
+      if (rec) {
+        rec.onresult = null;
+        rec.onend = null;
+        rec.onerror = null;
+        try {
+          rec.abort();
+        } catch {
+          /* already stopped */
+        }
+        recognitionRef.current = null;
+      }
+      setIsListening(false);
+      baseMessageRef.current = "";
+      currentSessionFinalRef.current = "";
+
       onSendMessage(trimmed, cropName?.trim() || undefined, language);
       setMessage("");
       if (isTyping) {
